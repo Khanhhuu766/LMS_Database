@@ -1,0 +1,13 @@
+-- =================================================================================
+-- MỤC 2.1: THỦ TỤC THÊM (INSERT), SỬA (UPDATE), XÓA (DELETE) TRÊN 1 BẢNG DỮ LIỆU
+-- Người phụ trách : [Điền tên thành viên]
+-- Bảng được chọn  : [Nhóm tự quyết định chọn 1 bảng]
+-- Yêu cầu đề bài  :
+--   1. Viết 3 thủ tục thêm, sửa, xóa dữ liệu cho bảng đã chọn.
+--   2. Thực hiện kiểm tra dữ liệu hợp lệ (Validate) để đảm bảo các ràng buộc.
+--   3. Xuất thông báo lỗi có ý nghĩa, chỉ rõ lỗi sai cụ thể (không báo lỗi chung chung).
+--   4. Với thủ tục xóa (DELETE): xác định rõ khi nào được xóa, khi nào không được xóa,
+--      mục đích của thủ tục xóa là gì và tại sao cần xóa.
+-- =================================================================================
+
+-- TODO: Thành viên thiết kế và viết 3 thủ tục Thêm, Sửa, Xóa tại đây

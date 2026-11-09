@@ -1,0 +1,11 @@
+-- =================================================================================
+-- MỤC 1.1: TẠO BẢNG VÀ CÁC RÀNG BUỘC TOÀN VẸN
+-- Người phụ trách : [Điền tên thành viên]
+-- Yêu cầu đề bài  :
+--   1. Hiện thực đầy đủ 25 bảng dữ liệu đã thiết kế trong BTL1.
+--   2. Khai báo đầy đủ khóa chính (PK), khóa ngoại (FK), UNIQUE và miền giá trị.
+--   3. Những ràng buộc ngữ nghĩa nào kiểm tra được trong câu lệnh tạo bảng (CHECK)
+--      thì bắt buộc khai báo ngay tại đây, KHÔNG dùng Trigger để kiểm tra.
+-- =================================================================================
+
+-- TODO: Viết các câu lệnh CREATE TABLE theo thứ tự bảng cha trước, bảng con sau tại đây

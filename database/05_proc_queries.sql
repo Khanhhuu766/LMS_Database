@@ -1,0 +1,14 @@
+-- =================================================================================
+-- MỤC 2.3: VIẾT 2 THỦ TỤC TRUY VẤN HIỂN THỊ DỮ LIỆU
+-- Người phụ trách Thủ tục 1 : [Điền tên thành viên]
+-- Người phụ trách Thủ tục 2 : [Điền tên thành viên]
+-- Yêu cầu đề bài :
+--   - Chỉ chứa các câu truy vấn hiển thị dữ liệu, tham số đầu vào truyền vào mệnh đề
+--     WHERE và/hoặc HAVING.
+--   - Thủ tục 1: Truy vấn từ 2 bảng trở lên, có mệnh đề WHERE và ORDER BY.
+--   - Thủ tục 2: Truy vấn liên kết từ 2 bảng trở lên, có Aggregate Function,
+--                GROUP BY, HAVING, WHERE và ORDER BY.
+--   - Bắt buộc có ít nhất 1 thủ tục liên quan đến bảng dữ liệu đã chọn ở mục 2.1.
+-- =================================================================================
+
+-- TODO: Thành viên thiết kế và viết 2 thủ tục truy vấn tại đây

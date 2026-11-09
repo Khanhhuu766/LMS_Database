@@ -1,0 +1,12 @@
+-- =================================================================================
+-- MỤC 2.4: VIẾT 2 HÀM (FUNCTION) TÍNH TOÁN SỬ DỤNG CON TRỎ
+-- Người phụ trách Hàm 1 : [Điền tên thành viên]
+-- Người phụ trách Hàm 2 : [Điền tên thành viên]
+-- Yêu cầu đề bài :
+--   1. Có tham số đầu vào và thực hiện kiểm tra tham số đầu vào hợp lệ.
+--   2. Chứa câu lệnh truy vấn dữ liệu để lấy dữ liệu phục vụ tính toán.
+--   3. Bắt buộc sử dụng CON TRỎ (CURSOR) kết hợp câu lệnh IF và/hoặc vòng lặp (LOOP/WHILE)
+--      để duyệt và tính toán dữ liệu.
+-- =================================================================================
+
+-- TODO: Thành viên thiết kế và viết 2 hàm sử dụng con trỏ tại đây

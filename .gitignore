@@ -1,0 +1,36 @@
+# =================================================================================
+# .gitignore - Dự án BK-LMS (BTL2 Hệ Cơ sở Dữ liệu)
+# =================================================================================
+
+# File dữ liệu và sao lưu của MS SQL Server
+*.mdf
+*.ldf
+*.ndf
+*.bak
+*.trn
+*.dacpac
+*.bacpac
+
+# File tạm và nhật ký
+*.log
+*.tmp
+*.temp
+*~
+
+# File rác hệ điều hành (Windows / macOS / Linux)
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Cấu hình cá nhân của IDE / Editor
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates

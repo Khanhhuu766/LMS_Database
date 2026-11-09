@@ -1,0 +1,14 @@
+# =================================================================================
+# .gitattributes - Đồng bộ chuẩn kết thúc dòng (Line Endings) chống Merge Conflict
+# =================================================================================
+
+* text=auto
+
+# Cố định CRLF cho các file SQL, PowerShell, Batch và Markdown trên Windows
+*.sql text eol=crlf
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.md  text eol=crlf
+
+# Cố định LF cho script Bash
+*.sh  text eol=lf
