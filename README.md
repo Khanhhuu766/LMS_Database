@@ -84,11 +84,3 @@ Mở **PowerShell** tại thư mục gốc của dự án và chạy:
 
 ---
 
-## 5. Quy ước làm việc nhóm & Chống Merge Conflict
-
-1. **Giữ nguyên tên bảng và tên cột từ BTL1:** Tra cứu tại [`docs/01_schema_25_tables.md`](docs/01_schema_25_tables.md). Với các bảng trùng từ khóa của SQL Server (`USER`, `FILE`, `COMMENT`, `STATUS`), luôn đặt trong cặp ngoặc vuông: `[USER]`, `[FILE]`, `[COMMENT]`, `[STATUS]`.
-2. **Tuân thủ phân loại ràng buộc:** Những ràng buộc kiểm tra được ở mức bảng bắt buộc dùng `CHECK` / `UNIQUE` / `FK` trong `01_schema_tables.sql`, không dùng Trigger (tham khảo [`docs/02_semantic_constraints.md`](docs/02_semantic_constraints.md), nếu không phù hợp thì có thể sửa đổi.).
-3. **Quy tắc viết vào các khung Section (`02_seed_data.sql`, `04_triggers.sql`, `07_demo_test_cases.sql`):**
-   * Mỗi thành viên chỉ viết code bên trong khung `-- PHẦN CỦA TV...` đã được phân định sẵn cho mình (xem [`docs/03_task_assignment.md`](docs/03_task_assignment.md)).
-   * Không sửa hoặc xóa khung comment của thành viên khác và không dùng *Format Document* cho toàn bộ file dùng chung để Git luôn tự động ghép code (auto-merge) không xung đột.
-4. **Ngăn cách Batch T-SQL:** Sử dụng lệnh `GO` trên một dòng riêng biệt sau mỗi khối `CREATE PROCEDURE`, `CREATE TRIGGER`, `CREATE FUNCTION`.
