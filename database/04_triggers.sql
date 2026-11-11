@@ -18,7 +18,86 @@
 -- Quy ước: TV2 CHỈ VIẾT TRONG KHUNG NÀY, KHÔNG SỬA RA NGOÀI KHUNG
 -- =================================================================================
 -- TODO
-GO
+  USE [LMS_DB];
+    GO
+
+    CREATE OR ALTER TRIGGER dbo.trg_tv2_rb18_attempt_limit
+    ON dbo.[ATTEMPT]
+    AFTER INSERT, UPDATE
+    AS
+    BEGIN
+        SET NOCOUNT ON;
+
+        IF NOT EXISTS (SELECT 1 FROM inserted)
+            RETURN;
+
+        IF EXISTS
+        (
+            SELECT 1
+            FROM
+            (
+                SELECT DISTINCT student_id, test_id
+                FROM inserted
+                WHERE student_id IS NOT NULL
+                AND test_id IS NOT NULL
+            ) AS affected
+            INNER JOIN dbo.[TEST] AS t
+                ON t.test_id = affected.test_id
+            CROSS APPLY
+            (
+                SELECT COUNT_BIG(*) AS attempt_count
+                FROM dbo.[ATTEMPT] AS a WITH (UPDLOCK, HOLDLOCK)
+                WHERE a.student_id = affected.student_id
+                AND a.test_id = affected.test_id
+            ) AS counted
+            WHERE counted.attempt_count > t.max_attempts
+        )
+        BEGIN
+            THROW 50018,
+                N'RB18: Sinh vien da vuot qua so lan lam bai toi da cua bai kiem tra.',
+                1;
+        END
+    END;
+    GO
+
+    CREATE OR ALTER TRIGGER dbo.trg_tv2_rb18_test_max_attempts
+    ON dbo.[TEST]
+    AFTER UPDATE
+    AS
+    BEGIN
+        SET NOCOUNT ON;
+
+        IF NOT UPDATE(max_attempts)
+            RETURN;
+
+        IF EXISTS
+        (
+            SELECT 1
+            FROM inserted AS t
+            INNER JOIN dbo.[ATTEMPT] AS a WITH (UPDLOCK, HOLDLOCK)
+                ON a.test_id = t.test_id
+            WHERE a.student_id IS NOT NULL
+            GROUP BY t.test_id, a.student_id, t.max_attempts
+            HAVING COUNT_BIG(*) > t.max_attempts
+        )
+        BEGIN
+            THROW 50019,
+                N'RB18: Khong the giam max_attempts thap hon so lan lam bai da ton tai.',
+                1;
+        END
+    END;
+    GO
+
+    SELECT name, is_disabled
+    FROM sys.triggers
+    WHERE name IN
+    (
+        N'trg_tv2_rb18_attempt_limit',
+        N'trg_tv2_rb18_test_max_attempts'
+    )
+    ORDER BY name;
+    GO
+
 
 -- =================================================================================
 -- PHẦN CỦA TV3: MỤC 2.2.2 - TRIGGER TÍNH GIÁ TRỊ THUỘC TÍNH DẪN XUẤT
