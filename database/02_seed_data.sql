@@ -138,7 +138,7 @@ BEGIN TRY
         (10, 5);
 
     COMMIT TRANSACTION;
-    PRINT N'TV2: Da insert thanh cong du lieu mau cho 9 bang.';
+    PRINT N'TV2: Da insert thanh cong du lieu mau cho 9 bang: [USER], [STUDENT], [ADMIN], [FACULTY], [LECTURER], [LECTURER_DEGREE], [USER_SESSION], [SUBJECT], [PREREQUISITE].';
 END TRY
 BEGIN CATCH
     IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
