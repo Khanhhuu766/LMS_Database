@@ -1,0 +1,16 @@
+USE master;
+GO
+
+IF DB_ID(N'LMS_DB') IS NOT NULL
+BEGIN
+    ALTER DATABASE [LMS_DB]
+    SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+
+    DROP DATABASE [LMS_DB];
+    PRINT N'Da xoa database LMS_DB.';
+END
+ELSE
+BEGIN
+    PRINT N'Database LMS_DB khong ton tai.';
+END;
+GO
