@@ -1,4 +1,4 @@
--- =================================================================================
+﻿-- =================================================================================
 -- MỤC 1.2: TẠO DỮ LIỆU MẪU (SEED DATA)
 -- Yêu cầu đề bài  :
 --   1. Tạo dữ liệu mẫu có ý nghĩa thực tế ở TẤT CẢ 25 bảng.
@@ -42,7 +42,7 @@ BEGIN TRY
     SET IDENTITY_INSERT dbo.[USER] OFF;
     SET @identity_on = NULL;
 
-  
+
     INSERT INTO dbo.[STUDENT] ([user_id], [student_code], [enrollment_year])
     VALUES
         (1, N'2410001', 2024),
@@ -51,7 +51,7 @@ BEGIN TRY
         (4, N'2410004', 2024),
         (5, N'2510005', 2025);
 
-  
+
     INSERT INTO dbo.[ADMIN] ([user_id], [admin_code], [office_room])
     VALUES
         (6, N'ADM001', N'A101'),
@@ -72,7 +72,7 @@ BEGIN TRY
     SET IDENTITY_INSERT dbo.[FACULTY] OFF;
     SET @identity_on = NULL;
 
-    
+
     INSERT INTO dbo.[LECTURER] ([user_id], [lecturer_code], [academic_rank], [faculty_id])
     VALUES
         (11, N'GV001', N'Phó giáo sư', 1),
@@ -92,7 +92,7 @@ BEGIN TRY
         (14, N'PhD'),
         (15, N'MSc');
 
-  
+
     INSERT INTO dbo.[USER_SESSION] ([login_time], [ip_address], [ua_id])
     VALUES
         (N'2026-11-01T08:00:00', N'192.0.2.1', 1001),
@@ -316,7 +316,103 @@ GO
 -- Bảng: [TEST], [QUESTION], [CHOICE], [CONTAINS_QUESTION]
 -- Quy ước: TV4 CHỈ VIẾT TRONG KHUNG NÀY, KHÔNG SỬA RA NGOÀI KHUNG
 -- =================================================================================
--- TODO
+IF EXISTS (SELECT 1 FROM [TEST]) OR EXISTS (SELECT 1 FROM [QUESTION])
+BEGIN
+    PRINT N'[TV4] TEST / QUESTION da co du lieu -> bo qua, khong chen lai.';
+    RETURN;
+END;
+
+DECLARE @c1 INT, @c2 INT, @c3 INT;
+SELECT @c1 = MAX(CASE WHEN rn = 1 THEN class_id END),
+       @c2 = MAX(CASE WHEN rn = 2 THEN class_id END),
+       @c3 = MAX(CASE WHEN rn = 3 THEN class_id END)
+FROM (SELECT class_id, ROW_NUMBER() OVER (ORDER BY class_id) AS rn FROM [CLASS]) AS x;
+
+IF @c3 IS NULL
+BEGIN
+    RAISERROR(N'[TV4] Bang CLASS can it nhat 3 dong (Section TV3 chua chay).', 16, 1);
+    RETURN;
+END;
+
+DECLARE @c1ch1 INT = (SELECT MIN(chapter_id) FROM [CHAPTER] WHERE class_id = @c1);
+DECLARE @c1ch2 INT = (SELECT MIN(chapter_id) FROM [CHAPTER] WHERE class_id = @c1 AND chapter_id > @c1ch1);
+DECLARE @c3ch1 INT = (SELECT MIN(chapter_id) FROM [CHAPTER] WHERE class_id = @c3);
+
+BEGIN TRANSACTION;
+
+SET IDENTITY_INSERT [QUESTION] ON;
+INSERT INTO [QUESTION] (question_id, question_type, question_content, max_score) VALUES
+ (1,  N'MULTIPLE_CHOICE', N'Thuộc tính khóa chính của một quan hệ phải thỏa tính chất nào sau đây?', 1.00),
+ (2,  N'MULTIPLE_CHOICE', N'Phép toán nào trong đại số quan hệ dùng để chọn các bộ thỏa một điều kiện?', 1.00),
+ (3,  N'TRUE_FALSE',      N'Một bảng có thể có nhiều khóa chính.', 1.00),
+ (4,  N'TRUE_FALSE',      N'Khóa ngoại có thể nhận giá trị NULL khi thực thể tham gia từng phần vào liên kết.', 1.00),
+ (5,  N'MULTIPLE_CHOICE', N'Quan hệ đã ở dạng chuẩn 2NF, để đạt 3NF cần loại bỏ loại phụ thuộc nào?', 2.00),
+ (6,  N'MULTIPLE_CHOICE', N'Mệnh đề nào dùng để lọc các nhóm sau khi đã GROUP BY?', 1.00),
+ (7,  N'ESSAY',           N'Trình bày sự khác nhau giữa thực thể mạnh và thực thể yếu trong mô hình ER.', 3.00),
+ (8,  N'ESSAY',           N'Nêu các bước ánh xạ một liên kết N:M từ ERD sang lược đồ quan hệ.', 3.00),
+ (9,  N'MULTIPLE_CHOICE', N'Lệnh nào xóa toàn bộ dòng của bảng nhưng vẫn giữ lại cấu trúc bảng?', 1.00),
+ (10, N'TRUE_FALSE',      N'Trigger AFTER INSERT được thực thi trước khi dòng dữ liệu mới được thêm vào bảng.', 1.00),
+ (11, N'MULTIPLE_CHOICE', N'Ràng buộc nào bảo đảm giá trị của một cột phải tồn tại trong bảng được tham chiếu?', 1.00),
+ (12, N'ESSAY',           N'Giải thích thuộc tính dẫn xuất và cho một ví dụ trong hệ thống quản lý học tập.', 2.00);
+SET IDENTITY_INSERT [QUESTION] OFF;
+
+INSERT INTO [CHOICE] (choice_content, is_true, question_id) VALUES
+ (N'Giá trị duy nhất và không được NULL', 1, 1),
+ (N'Có thể trùng giữa các bộ',            0, 1),
+ (N'Luôn phải là kiểu số nguyên',         0, 1),
+ (N'Được phép nhận giá trị NULL',         0, 1),
+ (N'Phép chọn (σ)',                       1, 2),
+ (N'Phép chiếu (π)',                      0, 2),
+ (N'Phép hợp (∪)',                        0, 2),
+ (N'Phép tích Descartes (×)',             0, 2),
+ (N'Đúng', 0, 3),
+ (N'Sai',  1, 3),
+ (N'Đúng', 1, 4),
+ (N'Sai',  0, 4),
+ (N'Phụ thuộc bắc cầu',                   1, 5),
+ (N'Phụ thuộc hàm riêng phần',            0, 5),
+ (N'Phụ thuộc đa trị',                    0, 5),
+ (N'Phụ thuộc hàm tầm thường',            0, 5),
+ (N'HAVING',                              1, 6),
+ (N'WHERE',                               0, 6),
+ (N'ORDER BY',                            0, 6),
+ (N'DISTINCT',                            0, 6),
+ (N'TRUNCATE TABLE',                      1, 9),
+ (N'DROP TABLE',                          0, 9),
+ (N'ALTER TABLE',                         0, 9),
+ (N'DROP DATABASE',                       0, 9),
+ (N'Đúng', 0, 10),
+ (N'Sai',  1, 10),
+ (N'FOREIGN KEY',                         1, 11),
+ (N'UNIQUE',                              0, 11),
+ (N'CHECK',                               0, 11),
+ (N'DEFAULT',                             0, 11);
+
+SET IDENTITY_INSERT [TEST] ON;
+INSERT INTO [TEST] (test_id, test_name, test_type, test_start, test_end, test_timer,
+                    max_attempts, grading_method, class_id, chapter_id) VALUES
+ (1, N'Quiz chương 1 - Tổng quan CSDL',      N'ONLINE',          '2026-09-21T08:00:00', '2026-09-21T23:59:00', 30,   2, 'HIGHEST', @c1, @c1ch1),
+ (2, N'Quiz chương 2 - Mô hình ER',          N'ONLINE',          '2026-10-05T08:00:00', '2026-10-12T23:59:00', 20,   3, 'AVERAGE', @c1, @c1ch2),
+ (3, N'Kiểm tra giữa kỳ',                    N'ONLINE',          '2026-10-20T13:00:00', '2026-10-20T15:00:00', 60,   1, 'FIRST',   @c2, NULL),
+ (4, N'Nộp bài tập lớn 1',                   N'FILE_SUBMISSION', '2026-11-01T00:00:00', '2026-11-15T23:59:00', NULL, 1, 'LATEST',  @c2, NULL),
+ (5, N'Quiz chương 4 - Đại số quan hệ',      N'ONLINE',          '2026-11-10T09:00:00', '2026-11-10T17:00:00', 45,   2, 'LATEST',  @c3, @c3ch1),
+ (6, N'Kiểm tra cuối kỳ',                    N'ONLINE',          '2026-12-20T07:30:00', '2026-12-20T11:30:00', 90,   1, 'HIGHEST', @c3, NULL);
+SET IDENTITY_INSERT [TEST] OFF;
+
+INSERT INTO [CONTAINS_QUESTION] (test_id, question_id, custom_score) VALUES
+ (1, 1, NULL), (1, 2, 1.50), (1, 3, NULL), (1, 6, NULL),
+ (2, 4, NULL), (2, 5, 2.50), (2, 9, NULL), (2, 11, NULL),
+ (3, 1, NULL), (3, 2, NULL), (3, 5, NULL), (3, 6, NULL), (3, 7, 4.00), (3, 8, NULL),
+ (4, 12, NULL),
+ (5, 3, NULL), (5, 4, NULL), (5, 10, 0.50), (5, 11, NULL),
+ (6, 1, NULL), (6, 5, NULL), (6, 6, NULL), (6, 7, NULL), (6, 8, 4.00), (6, 9, NULL), (6, 12, NULL);
+
+COMMIT TRANSACTION;
+
+SELECT N'QUESTION' AS bang, COUNT(*) AS so_dong FROM [QUESTION]
+UNION ALL SELECT N'CHOICE',            COUNT(*) FROM [CHOICE]
+UNION ALL SELECT N'TEST',              COUNT(*) FROM [TEST]
+UNION ALL SELECT N'CONTAINS_QUESTION', COUNT(*) FROM [CONTAINS_QUESTION];
 GO
 
 -- =================================================================================
