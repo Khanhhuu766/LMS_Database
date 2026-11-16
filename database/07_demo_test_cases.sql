@@ -1,4 +1,4 @@
--- =================================================================================
+﻿-- =================================================================================
 -- KỊCH BẢN KIỂM THỬ & MINH HỌA KHI BÁO CÁO (DEMO TEST CASES)
 -- Yêu cầu đề bài :
 --   - Chuẩn bị sẵn các câu lệnh và dữ liệu minh họa cho việc kiểm tra Trigger (2.2),
@@ -145,7 +145,220 @@ GO
 -- PHẦN CỦA TV4: KIỂM THỬ MỤC 2.3 - 2 THỦ TỤC TRUY VẤN DỮ LIỆU
 -- Quy ước: TV4 CHỈ VIẾT TRONG KHUNG NÀY, KHÔNG SỬA RA NGOÀI KHUNG
 -- =================================================================================
--- TODO
+USE [LMS_DB];
+GO
+SET NOCOUNT ON;
+
+PRINT N'=== [TV4 - MỤC 2.3] BẮT ĐẦU KIỂM THỬ 2 THỦ TỤC TRUY VẤN ===';
+-- Điều kiện: đã chạy 01 (tạo bảng), 02 (dữ liệu mẫu, gồm Section TV4 và TV5) và 05 (tạo thủ tục).
+-- Ngày truyền theo dạng YYYYMMDD (không phụ thuộc ngôn ngữ/DATEFORMAT của SQL Server).
+-- Dữ liệu bài kiểm tra lấy từ Section TV4 của 02_seed_data.sql: 6 bài, 3 lớp đầu tiên trong CLASS.
+GO
+
+-- =================================================================================
+-- PHẦN 1. KIỂM THỬ TỰ ĐỘNG (PASS/FAIL) - số dòng trả về của dbo.usp_Test_Search
+-- =================================================================================
+IF OBJECT_ID('tempdb..#s1') IS NOT NULL DROP TABLE #s1;
+CREATE TABLE #s1 (
+    test_id INT, test_name NVARCHAR(200), test_type NVARCHAR(30), class_name NVARCHAR(100),
+    subject_name NVARCHAR(150), chapter_name NVARCHAR(200), test_start DATETIME, test_end DATETIME,
+    test_timer INT, max_attempts INT, grading_method NVARCHAR(10),
+    so_cau_hoi INT, tong_diem_toi_da DECIMAL(10,2)
+);
+
+DECLARE @c1 INT = (SELECT TOP (1) class_id FROM dbo.[CLASS] ORDER BY class_id);
+DECLARE @n  INT;
+
+-- A1. Không lọc -> đủ các bài kiểm tra trong hệ thống (>= 6)
+INSERT INTO #s1 EXEC dbo.usp_Test_Search;
+SELECT @n = COUNT(*) FROM #s1; TRUNCATE TABLE #s1;
+IF @n >= 6 PRINT N'PASS [Thủ tục 1 - A1]: Không lọc, trả về ' + CONVERT(NVARCHAR(10), @n) + N' bài kiểm tra.';
+ELSE THROW 53001, N'FAIL [Thủ tục 1 - A1]: Kỳ vọng >= 6 bài kiểm tra.', 1;
+
+-- A2. Lọc theo lớp đầu tiên -> 2 bài (Quiz chương 1, Quiz chương 2)
+INSERT INTO #s1 EXEC dbo.usp_Test_Search @class_id = @c1;
+SELECT @n = COUNT(*) FROM #s1; TRUNCATE TABLE #s1;
+IF @n = 2 PRINT N'PASS [Thủ tục 1 - A2]: Lọc theo lớp -> 2 bài.';
+ELSE THROW 53002, N'FAIL [Thủ tục 1 - A2]: Kỳ vọng 2 bài của lớp đầu tiên.', 1;
+
+-- A3. Lọc theo hình thức nộp tập tin -> 1 bài
+INSERT INTO #s1 EXEC dbo.usp_Test_Search @test_type = N'FILE_SUBMISSION';
+SELECT @n = COUNT(*) FROM #s1; TRUNCATE TABLE #s1;
+IF @n = 1 PRINT N'PASS [Thủ tục 1 - A3]: Lọc hình thức FILE_SUBMISSION -> 1 bài.';
+ELSE THROW 53003, N'FAIL [Thủ tục 1 - A3]: Kỳ vọng 1 bài nộp tập tin.', 1;
+
+-- A4. Lọc theo phương thức tính điểm AVERAGE + từ khóa "Quiz" -> 1 bài
+INSERT INTO #s1 EXEC dbo.usp_Test_Search @grading_method = N'AVERAGE', @keyword = N'Quiz';
+SELECT @n = COUNT(*) FROM #s1; TRUNCATE TABLE #s1;
+IF @n = 1 PRINT N'PASS [Thủ tục 1 - A4]: AVERAGE + từ khóa "Quiz" -> 1 bài.';
+ELSE THROW 53004, N'FAIL [Thủ tục 1 - A4]: Kỳ vọng 1 bài.', 1;
+
+-- A5. Lọc theo khoảng thời gian 01/10/2026 - 10/11/2026 -> 4 bài (bài ngày 10/11 vẫn được tính)
+INSERT INTO #s1 EXEC dbo.usp_Test_Search @from_date = '20261001', @to_date = '20261110';
+SELECT @n = COUNT(*) FROM #s1; TRUNCATE TABLE #s1;
+IF @n = 4 PRINT N'PASS [Thủ tục 1 - A5]: Khoảng 01/10 - 10/11/2026 -> 4 bài.';
+ELSE THROW 53005, N'FAIL [Thủ tục 1 - A5]: Kỳ vọng 4 bài trong khoảng thời gian.', 1;
+
+-- A6. Kết hợp nhiều điều kiện -> 1 bài (Quiz chương 1)
+INSERT INTO #s1 EXEC dbo.usp_Test_Search
+    @class_id = @c1, @test_type = N'ONLINE', @grading_method = N'HIGHEST',
+    @from_date = '20260901', @to_date = '20260930';
+SELECT @n = COUNT(*) FROM #s1; TRUNCATE TABLE #s1;
+IF @n = 1 PRINT N'PASS [Thủ tục 1 - A6]: Kết hợp lớp + hình thức + cách tính điểm + tháng 9 -> 1 bài.';
+ELSE THROW 53006, N'FAIL [Thủ tục 1 - A6]: Kỳ vọng 1 bài.', 1;
+
+-- A7. Trường hợp biên: mã lớp không tồn tại / từ khóa không khớp -> 0 dòng, không báo lỗi
+INSERT INTO #s1 EXEC dbo.usp_Test_Search @class_id = 999999;
+SELECT @n = COUNT(*) FROM #s1; TRUNCATE TABLE #s1;
+IF @n = 0 PRINT N'PASS [Thủ tục 1 - A7a]: Mã lớp không tồn tại -> 0 dòng.';
+ELSE THROW 53007, N'FAIL [Thủ tục 1 - A7a]: Kỳ vọng 0 dòng.', 1;
+
+INSERT INTO #s1 EXEC dbo.usp_Test_Search @keyword = N'không có bài này';
+SELECT @n = COUNT(*) FROM #s1; TRUNCATE TABLE #s1;
+IF @n = 0 PRINT N'PASS [Thủ tục 1 - A7b]: Từ khóa không khớp -> 0 dòng.';
+ELSE THROW 53008, N'FAIL [Thủ tục 1 - A7b]: Kỳ vọng 0 dòng.', 1;
+
+-- A8. Trường hợp biên: ngày bắt đầu sau ngày kết thúc -> 0 dòng, không báo lỗi
+INSERT INTO #s1 EXEC dbo.usp_Test_Search @from_date = '20261231', @to_date = '20260101';
+SELECT @n = COUNT(*) FROM #s1; TRUNCATE TABLE #s1;
+IF @n = 0 PRINT N'PASS [Thủ tục 1 - A8]: Ngày đảo ngược -> 0 dòng.';
+ELSE THROW 53009, N'FAIL [Thủ tục 1 - A8]: Kỳ vọng 0 dòng.', 1;
+
+DROP TABLE #s1;
+GO
+
+-- =================================================================================
+-- PHẦN 2. KIỂM THỬ TỰ ĐỘNG (PASS/FAIL) - dbo.usp_Test_ScoreStatistics
+--   Phụ thuộc dữ liệu ATTEMPT của TV5. Kiểm tra theo tính chất của kết quả
+--   (thang điểm mỗi bài khác nhau nên không so với một con số cố định).
+-- =================================================================================
+IF OBJECT_ID('tempdb..#s2') IS NOT NULL DROP TABLE #s2;
+CREATE TABLE #s2 (
+    test_id INT, test_name NVARCHAR(200), class_name NVARCHAR(100), grading_method NVARCHAR(10),
+    so_lan_lam INT, so_sinh_vien INT, diem_trung_binh DECIMAL(5,2),
+    diem_cao_nhat DECIMAL(5,2), diem_thap_nhat DECIMAL(5,2), phut_lam_bai_tb INT
+);
+
+DECLARE @c1 INT = (SELECT TOP (1) class_id FROM dbo.[CLASS] ORDER BY class_id);
+DECLARE @n1 INT, @n INT;
+
+-- B1. Mặc định: có ít nhất 1 bài có lần làm đã nộp
+INSERT INTO #s2 EXEC dbo.usp_Test_ScoreStatistics;
+SELECT @n1 = COUNT(*) FROM #s2;
+IF @n1 >= 1 PRINT N'PASS [Thủ tục 2 - B1]: Mặc định trả về ' + CONVERT(NVARCHAR(10), @n1) + N' bài có kết quả.';
+ELSE THROW 53011, N'FAIL [Thủ tục 2 - B1]: Kỳ vọng có ít nhất 1 bài (kiểm tra dữ liệu ATTEMPT của TV5).', 1;
+
+-- B1'. Đối chiếu số liệu với phép tính thủ công trên bảng ATTEMPT (đếm, trung bình, lớn nhất, nhỏ nhất)
+IF EXISTS (
+    SELECT 1
+    FROM #s2 AS r
+    CROSS APPLY (
+        SELECT COUNT(*) AS c, CAST(AVG(a.score) AS DECIMAL(5,2)) AS av, MAX(a.score) AS mx, MIN(a.score) AS mn
+        FROM dbo.[ATTEMPT] AS a
+        WHERE a.test_id = r.test_id AND a.end_time IS NOT NULL AND a.score IS NOT NULL
+    ) AS x
+    WHERE x.c <> r.so_lan_lam OR x.av <> r.diem_trung_binh OR x.mx <> r.diem_cao_nhat OR x.mn <> r.diem_thap_nhat
+)
+    THROW 53012, N'FAIL [Thủ tục 2 - B1]: Số liệu thống kê không khớp tính thủ công.', 1;
+ELSE
+    PRINT N'PASS [Thủ tục 2 - B1b]: Số lần làm, điểm TB, cao nhất, thấp nhất khớp tính thủ công.';
+TRUNCATE TABLE #s2;
+
+-- B2. Lọc theo lớp: số bài không vượt quá khi không lọc
+INSERT INTO #s2 EXEC dbo.usp_Test_ScoreStatistics @class_id = @c1;
+SELECT @n = COUNT(*) FROM #s2; TRUNCATE TABLE #s2;
+IF @n <= @n1 PRINT N'PASS [Thủ tục 2 - B2]: Lọc theo lớp -> ' + CONVERT(NVARCHAR(10), @n) + N' bài (<= không lọc).';
+ELSE THROW 53013, N'FAIL [Thủ tục 2 - B2]: Số bài lọc theo lớp vượt quá số bài khi không lọc.', 1;
+
+-- B3. HAVING so_lan_lam >= 3: mọi dòng trả về đều có từ 3 lần làm trở lên
+INSERT INTO #s2 EXEC dbo.usp_Test_ScoreStatistics @min_attempts = 3;
+IF EXISTS (SELECT 1 FROM #s2 WHERE so_lan_lam < 3)
+    THROW 53014, N'FAIL [Thủ tục 2 - B3]: Có bài dưới 3 lần làm vẫn được trả về.', 1;
+ELSE
+    PRINT N'PASS [Thủ tục 2 - B3]: HAVING số lần làm >= 3 hoạt động đúng.';
+TRUNCATE TABLE #s2;
+
+-- B4. HAVING diem_trung_binh >= 7: mọi dòng trả về đều có điểm trung bình >= 7
+INSERT INTO #s2 EXEC dbo.usp_Test_ScoreStatistics @min_avg_score = 7.00;
+IF EXISTS (SELECT 1 FROM #s2 WHERE diem_trung_binh < 7.00)
+    THROW 53015, N'FAIL [Thủ tục 2 - B4]: Có bài điểm trung bình dưới 7 vẫn được trả về.', 1;
+ELSE
+    PRINT N'PASS [Thủ tục 2 - B4]: HAVING điểm trung bình >= 7 hoạt động đúng.';
+TRUNCATE TABLE #s2;
+
+-- B5. Trường hợp biên: ngưỡng quá cao -> 0 dòng, không báo lỗi
+INSERT INTO #s2 EXEC dbo.usp_Test_ScoreStatistics @min_attempts = 100, @min_avg_score = 100.00;
+SELECT @n = COUNT(*) FROM #s2;
+IF @n = 0 PRINT N'PASS [Thủ tục 2 - B5]: Ngưỡng quá cao -> 0 dòng.';
+ELSE THROW 53016, N'FAIL [Thủ tục 2 - B5]: Kỳ vọng 0 dòng.', 1;
+
+DROP TABLE #s2;
+GO
+
+-- =================================================================================
+-- PHẦN 3. MINH HỌA TRỰC QUAN KHI BÁO CÁO (chạy từng lệnh để cho giảng viên xem kết quả)
+-- =================================================================================
+
+-- ---------- THỦ TỤC 1: dbo.usp_Test_Search ----------
+PRINT N'--- A1. Không lọc: tất cả bài kiểm tra, mới nhất trước ---';
+EXEC dbo.usp_Test_Search;
+GO
+
+PRINT N'--- A2. Lọc theo lớp đầu tiên ---';
+DECLARE @c1 INT = (SELECT TOP (1) class_id FROM dbo.[CLASS] ORDER BY class_id);
+EXEC dbo.usp_Test_Search @class_id = @c1;
+GO
+
+PRINT N'--- A3. Lọc theo hình thức nộp tập tin ---';
+EXEC dbo.usp_Test_Search @test_type = N'FILE_SUBMISSION';
+GO
+
+PRINT N'--- A4. Lọc theo cách tính điểm AVERAGE + từ khóa "Quiz" ---';
+EXEC dbo.usp_Test_Search @grading_method = N'AVERAGE', @keyword = N'Quiz';
+GO
+
+PRINT N'--- A5. Lọc theo khoảng thời gian 01/10/2026 - 10/11/2026 ---';
+EXEC dbo.usp_Test_Search @from_date = '20261001', @to_date = '20261110';
+GO
+
+PRINT N'--- A6. Kết hợp nhiều điều kiện ---';
+DECLARE @c1 INT = (SELECT TOP (1) class_id FROM dbo.[CLASS] ORDER BY class_id);
+EXEC dbo.usp_Test_Search @class_id = @c1, @test_type = N'ONLINE', @grading_method = N'HIGHEST',
+                         @from_date = '20260901', @to_date = '20260930';
+GO
+
+PRINT N'--- A7. Trường hợp biên: không có kết quả (mã lớp không tồn tại) ---';
+EXEC dbo.usp_Test_Search @class_id = 999999;
+GO
+
+-- ---------- THỦ TỤC 2: dbo.usp_Test_ScoreStatistics ----------
+PRINT N'--- B1. Thống kê mặc định ---';
+EXEC dbo.usp_Test_ScoreStatistics;
+GO
+
+PRINT N'--- B2. Thống kê theo lớp đầu tiên ---';
+DECLARE @c1 INT = (SELECT TOP (1) class_id FROM dbo.[CLASS] ORDER BY class_id);
+EXEC dbo.usp_Test_ScoreStatistics @class_id = @c1;
+GO
+
+PRINT N'--- B3. HAVING: chỉ các bài có từ 3 lần làm trở lên ---';
+EXEC dbo.usp_Test_ScoreStatistics @min_attempts = 3;
+GO
+
+PRINT N'--- B4. HAVING: chỉ các bài có điểm trung bình >= 7 ---';
+EXEC dbo.usp_Test_ScoreStatistics @min_avg_score = 7.00;
+GO
+
+PRINT N'--- B5. Kết hợp khoảng thời gian + HAVING ---';
+EXEC dbo.usp_Test_ScoreStatistics @from_date = '20261001', @to_date = '20261231',
+                                  @min_attempts = 2, @min_avg_score = 5.00;
+GO
+
+PRINT N'--- B6. Trường hợp biên: ngưỡng quá cao -> không có dòng nào ---';
+EXEC dbo.usp_Test_ScoreStatistics @min_attempts = 100, @min_avg_score = 100.00;
+GO
+
+PRINT N'=== [TV4 - MỤC 2.3] HOÀN TẤT KIỂM THỬ ===';
 GO
 
 -- =================================================================================
