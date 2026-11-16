@@ -62,7 +62,7 @@ for file in "${SQL_FILES[@]}"; do
     echo ""
     echo "--> Đang thực thi: $file ..."
 
-    CMD_ARGS=(-S "$DB_SERVER" -C -b -i "$filepath")
+    CMD_ARGS=(-S "$DB_SERVER" -C -I -b -i "$filepath")
     if [[ "$file" != "00_create_database.sql" && -n "$DB_NAME" ]]; then
         CMD_ARGS+=(-d "$DB_NAME")
     fi
