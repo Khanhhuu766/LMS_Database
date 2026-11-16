@@ -152,5 +152,81 @@ GO
 -- PHẦN CỦA TV5: KIỂM THỬ MỤC 2.4 - 2 HÀM TÍNH TOÁN SỬ DỤNG CON TRỎ (CURSOR)
 -- Quy ước: TV5 CHỈ VIẾT TRONG KHUNG NÀY, KHÔNG SỬA RA NGOÀI KHUNG
 -- =================================================================================
--- TODO
+USE [LMS_DB];
+GO
+SET NOCOUNT ON;
+
+PRINT N'=== [TV5 - MỤC 2.4] BẮT ĐẦU KIỂM THỬ 2 HÀM CURSOR ===';
+
+-- ---------------------------------------------------------------------------------
+-- 1. KIỂM THỬ HÀM 1: dbo.fn_CalculateStudentTestScore(@StudentId, @TestId)
+-- ---------------------------------------------------------------------------------
+DECLARE @f1_c1 DECIMAL(5,2) = dbo.fn_CalculateStudentTestScore(1, 1);     -- HIGHEST -> 4.50
+DECLARE @f1_c2 DECIMAL(5,2) = dbo.fn_CalculateStudentTestScore(1, 2);     -- AVERAGE -> 3.75
+DECLARE @f1_c3 DECIMAL(5,2) = dbo.fn_CalculateStudentTestScore(2, 3);     -- FIRST   -> 11.00
+DECLARE @f1_c4 DECIMAL(5,2) = dbo.fn_CalculateStudentTestScore(4, 5);     -- LATEST  -> 3.50
+DECLARE @f1_c5 DECIMAL(5,2) = dbo.fn_CalculateStudentTestScore(4, 6);     -- Chưa làm bài -> NULL
+DECLARE @f1_c6 DECIMAL(5,2) = dbo.fn_CalculateStudentTestScore(3, 1);     -- Chưa đăng ký lớp (RB3) -> -2.00
+DECLARE @f1_c7 DECIMAL(5,2) = dbo.fn_CalculateStudentTestScore(-1, 1);    -- Tham số <= 0 -> -1.00
+DECLARE @f1_c8 DECIMAL(5,2) = dbo.fn_CalculateStudentTestScore(NULL, 1);  -- Tham số NULL -> -1.00
+DECLARE @f1_c9 DECIMAL(5,2) = dbo.fn_CalculateStudentTestScore(999, 1);   -- Không tồn tại -> -1.00
+
+IF @f1_c1 = 4.50  PRINT N'PASS [Hàm 1 - Case 1]: SV1, Test 1 (HIGHEST) = 4.50';      ELSE THROW 54001, N'FAIL [Hàm 1 - Case 1]: Sai kết quả HIGHEST.', 1;
+IF @f1_c2 = 3.75  PRINT N'PASS [Hàm 1 - Case 2]: SV1, Test 2 (AVERAGE) = 3.75';      ELSE THROW 54002, N'FAIL [Hàm 1 - Case 2]: Sai kết quả AVERAGE.', 1;
+IF @f1_c3 = 11.00 PRINT N'PASS [Hàm 1 - Case 3]: SV2, Test 3 (FIRST) = 11.00';       ELSE THROW 54003, N'FAIL [Hàm 1 - Case 3]: Sai kết quả FIRST.', 1;
+IF @f1_c4 = 3.50  PRINT N'PASS [Hàm 1 - Case 4]: SV4, Test 5 (LATEST) = 3.50';       ELSE THROW 54004, N'FAIL [Hàm 1 - Case 4]: Sai kết quả LATEST.', 1;
+IF @f1_c5 IS NULL PRINT N'PASS [Hàm 1 - Case 5]: SV4, Test 6 (Chưa làm) = NULL';     ELSE THROW 54005, N'FAIL [Hàm 1 - Case 5]: Kỳ vọng NULL khi chưa làm bài.', 1;
+IF @f1_c6 = -2.00 PRINT N'PASS [Hàm 1 - Case 6]: SV3, Test 1 (Chưa đăng ký) = -2.00'; ELSE THROW 54006, N'FAIL [Hàm 1 - Case 6]: Kỳ vọng -2.00 khi vi phạm RB3.', 1;
+IF @f1_c7 = -1.00 AND @f1_c8 = -1.00 AND @f1_c9 = -1.00
+    PRINT N'PASS [Hàm 1 - Case 7]: Tham số không hợp lệ (-1, NULL, 999) đều trả về -1.00';
+ELSE
+    THROW 54007, N'FAIL [Hàm 1 - Case 7]: Xử lý tham số không hợp lệ chưa đúng.', 1;
+
+-- Bảng đối chiếu trực quan Hàm 1 với bảng TAKES_TEST
+SELECT
+    tt.student_id,
+    tt.test_id,
+    t.grading_method,
+    tt.final_score AS expected_final_score,
+    dbo.fn_CalculateStudentTestScore(tt.student_id, tt.test_id) AS function_result
+FROM dbo.[TAKES_TEST] AS tt
+INNER JOIN dbo.[TEST] AS t ON tt.test_id = t.test_id
+ORDER BY tt.student_id, tt.test_id;
+
+-- ---------------------------------------------------------------------------------
+-- 2. KIỂM THỬ HÀM 2: dbo.fn_CalculateStudentEngagementScore(@StudentId, @SemesterId)
+-- ---------------------------------------------------------------------------------
+DECLARE @f2_c1 DECIMAL(6,2) = dbo.fn_CalculateStudentEngagementScore(1, 5);    -- SV1, HK5 -> 29.00
+DECLARE @f2_c2 DECIMAL(6,2) = dbo.fn_CalculateStudentEngagementScore(4, 5);    -- SV4, HK5 -> 35.00
+DECLARE @f2_c3 DECIMAL(6,2) = dbo.fn_CalculateStudentEngagementScore(1, 3);    -- SV1, HK3 -> 25.00
+DECLARE @f2_c4 DECIMAL(6,2) = dbo.fn_CalculateStudentEngagementScore(4, 4);    -- SV4, HK4 (bị khóa thảo luận) -> 5.00
+DECLARE @f2_c5 DECIMAL(6,2) = dbo.fn_CalculateStudentEngagementScore(3, 3);    -- SV3, HK3 (không học lớp nào) -> 0.00
+DECLARE @f2_c6 DECIMAL(6,2) = dbo.fn_CalculateStudentEngagementScore(1, -2);   -- Tham số <= 0 -> -1.00
+DECLARE @f2_c7 DECIMAL(6,2) = dbo.fn_CalculateStudentEngagementScore(1, NULL); -- Tham số NULL -> -1.00
+DECLARE @f2_c8 DECIMAL(6,2) = dbo.fn_CalculateStudentEngagementScore(999, 5);  -- Không tồn tại -> -1.00
+
+IF @f2_c1 = 29.00 PRINT N'PASS [Hàm 2 - Case 1]: SV1, HK5 = 29.00'; ELSE THROW 54011, N'FAIL [Hàm 2 - Case 1]: Sai kết quả SV1 HK5.', 1;
+IF @f2_c2 = 35.00 PRINT N'PASS [Hàm 2 - Case 2]: SV4, HK5 = 35.00'; ELSE THROW 54012, N'FAIL [Hàm 2 - Case 2]: Sai kết quả SV4 HK5.', 1;
+IF @f2_c3 = 25.00 PRINT N'PASS [Hàm 2 - Case 3]: SV1, HK3 = 25.00'; ELSE THROW 54013, N'FAIL [Hàm 2 - Case 3]: Sai kết quả SV1 HK3.', 1;
+IF @f2_c4 = 5.00  PRINT N'PASS [Hàm 2 - Case 4]: SV4, HK4 (bị khóa thảo luận) = 5.00'; ELSE THROW 54014, N'FAIL [Hàm 2 - Case 4]: Sai kết quả SV4 HK4.', 1;
+IF @f2_c5 = 0.00  PRINT N'PASS [Hàm 2 - Case 5]: SV3, HK3 (không đăng ký lớp) = 0.00'; ELSE THROW 54015, N'FAIL [Hàm 2 - Case 5]: Sai kết quả SV3 HK3.', 1;
+IF @f2_c6 = -1.00 AND @f2_c7 = -1.00 AND @f2_c8 = -1.00
+    PRINT N'PASS [Hàm 2 - Case 6]: Tham số không hợp lệ (-2, NULL, 999) đều trả về -1.00';
+ELSE
+    THROW 54016, N'FAIL [Hàm 2 - Case 6]: Xử lý tham số không hợp lệ chưa đúng.', 1;
+
+-- Bảng đối chiếu trực quan Hàm 2 cho tất cả các kịch bản kiểm thử
+SELECT TestCase, StudentId, SemesterId, ExpectedScore, ActualScore
+FROM (VALUES
+    (N'SV1 - HK5 (Thảo luận nhiều lớp)',         1,    5,    29.00, @f2_c1),
+    (N'SV4 - HK5 (Thảo luận + làm bài test)',     4,    5,    35.00, @f2_c2),
+    (N'SV1 - HK3 (Hoàn thành 100% bài test)',     1,    3,    25.00, @f2_c3),
+    (N'SV4 - HK4 (Bị khóa thảo luận)',            4,    4,     5.00, @f2_c4),
+    (N'SV3 - HK3 (Chưa đăng ký lớp trong kỳ)',    3,    3,     0.00, @f2_c5),
+    (N'Tham số sai (SemesterId = -2)',            1,   -2,    -1.00, @f2_c6),
+    (N'Tham số sai (SemesterId = NULL)',          1, NULL,    -1.00, @f2_c7),
+    (N'Tham số sai (StudentId = 999)',          999,    5,    -1.00, @f2_c8)
+) AS Summary(TestCase, StudentId, SemesterId, ExpectedScore, ActualScore);
+
+PRINT N'=== [TV5 - MỤC 2.4] HOÀN TẤT KIỂM THỬ THÀNH CÔNG 100% ===';
 GO
