@@ -188,7 +188,7 @@ function Invoke-SqlFileWithSqlCmd {
         [string]$Pass
     )
 
-    $ArgsList = @("-S", $Server, "-C", "-b", "-f", "65001", "-i", $FilePath)
+    $ArgsList = @("-S", $Server, "-C", "-I", "-b", "-f", "65001", "-i", $FilePath)
     if (-not [string]::IsNullOrWhiteSpace($DbName)) {
         $ArgsList += @("-d", $DbName)
     }

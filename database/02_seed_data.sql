@@ -1,4 +1,4 @@
-﻿-- =================================================================================
+-- =================================================================================
 -- MỤC 1.2: TẠO DỮ LIỆU MẪU (SEED DATA)
 -- Yêu cầu đề bài  :
 --   1. Tạo dữ liệu mẫu có ý nghĩa thực tế ở TẤT CẢ 25 bảng.
@@ -420,5 +420,225 @@ GO
 -- Bảng: [TAKES_TEST], [ATTEMPT], [STUDENT_ANSWER], [POST], [COMMENT]
 -- Quy ước: TV5 CHỈ VIẾT TRONG KHUNG NÀY, KHÔNG SỬA RA NGOÀI KHUNG
 -- =================================================================================
--- TODO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+SET NOCOUNT ON;
+SET XACT_ABORT ON;
+
+DECLARE @identity_on SYSNAME = NULL;
+BEGIN TRY
+    BEGIN TRANSACTION;
+
+    IF NOT EXISTS (SELECT 1 FROM dbo.[POST])
+    BEGIN
+        -- -------------------------------------------------------------------------
+        -- POST (6 hàng)
+        -- Tuân thủ RB3, RB28: Chỉ Giảng viên dạy lớp đó hoặc Sinh viên đã đăng ký lớp
+        -- và có is_allowed_to_discuss = 1 trong ENROLLS mới được đăng bài;
+        -- thời gian đăng bài (post_start) nằm trong học kỳ của lớp.
+        -- -------------------------------------------------------------------------
+        SET IDENTITY_INSERT dbo.[POST] ON;
+        SET @identity_on = N'POST';
+        INSERT INTO dbo.[POST] ([post_id], [post_name], [post_description], [post_start], [ua_id], [class_id])
+        VALUES
+            (1, N'Thông báo quy định làm Bài tập lớn môn Cơ sở dữ liệu',
+                N'Các nhóm lưu ý giữ nguyên 25 bảng từ BTL1, kiểm tra kỹ các ràng buộc toàn vẹn bằng CHECK trước khi viết Trigger.',
+                N'2026-09-10T09:00:00', 1011, 3),
+            (2, N'Thắc mắc về chuyển đổi thực thể yếu CHAPTER và TOPIC sang lược đồ quan hệ',
+                N'Thầy và các bạn cho em hỏi khóa chính của TOPIC gồm những thuộc tính nào khi ánh xạ từ EERD sang bảng ạ?',
+                N'2026-09-23T14:15:00', 1001, 3),
+            (3, N'Hỏi về sự khác biệt giữa kiểm soát luồng và kiểm soát tắc nghẽn trong TCP',
+                N'Mình đang đọc slide Chương 2 nhưng chưa phân biệt rõ cửa sổ nhận (rwnd) và cửa sổ tắc nghẽn (cwnd).',
+                N'2026-10-07T10:30:00', 1004, 4),
+            (4, N'Hướng dẫn cài đặt phần mềm mô phỏng mạch logic Chương 2',
+                N'Các em tải file mô phỏng mạch cộng đã đính kèm trong Topic 1 của Chương 2 và chạy thử trước buổi học tuần tới.',
+                N'2026-10-15T08:00:00', 1012, 5),
+            (5, N'Lỗi tràn ngăn xếp khi gọi hàm đệ quy không có điều kiện dừng',
+                N'Khi em chạy bài tập tính giai thừa bằng đệ quy với n âm thì chương trình bị dừng đột ngột, nhờ thầy và các bạn giải thích giúp ạ.',
+                N'2025-09-21T19:00:00', 1002, 1),
+            (6, N'So sánh độ phức tạp chèn đầu và chèn cuối trong danh sách liên kết đơn',
+                N'Nếu chỉ quản lý con trỏ head mà không có con trỏ tail thì thao tác chèn cuối tốn O(n) đúng không ạ?',
+                N'2026-02-26T15:20:00', 1001, 2);
+        SET IDENTITY_INSERT dbo.[POST] OFF;
+        SET @identity_on = NULL;
+
+        -- -------------------------------------------------------------------------
+        -- COMMENT (10 hàng)
+        -- Tuân thủ RB3, RB28 & RB29:
+        --   - Người bình luận phải thuộc lớp của bài đăng và có quyền thảo luận
+        --     (Lưu ý: SV4 / ua_id = 1004 bị khóa thảo luận ở lớp 2 nên không bình luận ở lớp 2).
+        --   - comment_start >= post_start (và >= comment_start của bình luận cha).
+        --   - Bình luận phản hồi (parent_comment_id) phải thuộc cùng post_id với bình luận gốc.
+        -- -------------------------------------------------------------------------
+        SET IDENTITY_INSERT dbo.[COMMENT] ON;
+        SET @identity_on = N'COMMENT';
+        INSERT INTO dbo.[COMMENT] ([comment_id], [comment_content], [comment_start], [post_id], [ua_id], [parent_comment_id])
+        VALUES
+            (1,  N'Dạ thầy cho em hỏi mỗi bảng cần tối thiểu bao nhiêu dòng dữ liệu mẫu ạ?',
+                 N'2026-09-10T09:30:00', 1, 1001, NULL),
+            (2,  N'Mỗi bảng cần tối thiểu 5 dòng dữ liệu có ý nghĩa thực tế nhé An.',
+                 N'2026-09-10T09:45:00', 1, 1011, 1),
+            (3,  N'Dạ nhóm em đã nắm rõ thông tin, cảm ơn thầy ạ!',
+                 N'2026-09-10T10:10:00', 1, 1002, 2),
+            (4,  N'Vì TOPIC là thực thể yếu phụ thuộc vào CHAPTER nên khóa chính sẽ là (class_id, chapter_id, topic_id) đó bạn.',
+                 N'2026-09-23T14:40:00', 2, 1004, NULL),
+            (5,  N'Bạn Dũng trả lời chính xác rồi, các em nhớ khai báo khóa ngoại tổ hợp tham chiếu về CHAPTER nhé.',
+                 N'2026-09-23T15:05:00', 2, 1011, 4),
+            (6,  N'Kiểm soát luồng bảo vệ bộ đệm của bên nhận (dùng rwnd), còn kiểm soát tắc nghẽn bảo vệ mạng khỏi quá tải (dùng cwnd).',
+                 N'2026-10-07T11:00:00', 3, 1011, NULL),
+            (7,  N'Vậy lượng dữ liệu gửi đi tối đa tại một thời điểm sẽ bằng min(rwnd, cwnd) đúng không thầy?',
+                 N'2026-10-07T11:25:00', 3, 1001, 6),
+            (8,  N'Dạ cô ơi em đã tải file mô phỏng mạch cộng 4-bit về và chạy thử thành công rồi ạ.',
+                 N'2026-10-15T09:15:00', 4, 1003, NULL),
+            (9,  N'Bạn cần kiểm tra điều kiện n >= 0 trước khi gọi đệ quy, nếu chỉ dừng ở n == 0 thì với n âm hàm sẽ gọi vô hạn.',
+                 N'2025-09-21T19:30:00', 5, 1005, NULL),
+            (10, N'Đúng rồi bạn, vì phải duyệt từ head đến nút cuối cùng mới nối nút mới vào được.',
+                 N'2026-02-26T16:00:00', 6, 1002, NULL);
+        SET IDENTITY_INSERT dbo.[COMMENT] OFF;
+        SET @identity_on = NULL;
+    END;
+
+    IF NOT EXISTS (SELECT 1 FROM dbo.[TAKES_TEST])
+    BEGIN
+        -- -------------------------------------------------------------------------
+        -- TAKES_TEST (7 hàng)
+        -- Tuân thủ RB3 & RB26:
+        --   - Sinh viên phải thuộc lớp của bài kiểm tra (ENROLLS).
+        --   - final_score được tính chuẩn xác từ ATTEMPT.score theo TEST.grading_method:
+        --     * Test 1 (HIGHEST): SV1 = MAX(3.00, 4.50) = 4.50; SV2 = 3.50
+        --     * Test 2 (AVERAGE): SV1 = AVG(3.00, 4.50) = 3.75; SV5 = 5.50
+        --     * Test 3 (FIRST)  : SV2 = 11.00
+        --     * Test 4 (LATEST) : SV1 = 2.00
+        --     * Test 5 (LATEST) : SV4 = 3.50
+        -- -------------------------------------------------------------------------
+        INSERT INTO dbo.[TAKES_TEST] ([student_id], [test_id], [final_score])
+        VALUES
+            (1, 1, 4.50),
+            (2, 1, 3.50),
+            (1, 2, 3.75),
+            (5, 2, 5.50),
+            (2, 3, 11.00),
+            (1, 4, 2.00),
+            (4, 5, 3.50);
+
+        -- -------------------------------------------------------------------------
+        -- ATTEMPT (7 hàng)
+        -- Tuân thủ RB17, RB18, RB19, RB20, RB21, RB25:
+        --   - attempt_index tăng tuần tự 1, 2... và <= TEST.max_attempts.
+        --   - start_time và end_time nằm trong khoảng [test_start, test_end] của TEST.
+        --   - Thời gian làm bài (end_time - start_time) <= TEST.test_timer.
+        --   - score bằng đúng tổng score_awarded của các câu trả lời trong STUDENT_ANSWER.
+        -- -------------------------------------------------------------------------
+        SET IDENTITY_INSERT dbo.[ATTEMPT] ON;
+        SET @identity_on = N'ATTEMPT';
+        INSERT INTO dbo.[ATTEMPT] ([attempt_id], [attempt_index], [start_time], [end_time], [score], [student_id], [test_id])
+        VALUES
+            (1, 1, N'2026-09-21T08:10:00', N'2026-09-21T08:32:00', 3.00,  1, 1),
+            (2, 2, N'2026-09-21T14:00:00', N'2026-09-21T14:20:00', 4.50,  1, 1),
+            (3, 1, N'2026-09-21T09:00:00', N'2026-09-21T09:25:00', 3.50,  2, 1),
+            (4, 1, N'2026-10-06T10:00:00', N'2026-10-06T10:15:00', 3.00,  1, 2),
+            (5, 2, N'2026-10-08T15:00:00', N'2026-10-08T15:18:00', 4.50,  1, 2),
+            (6, 1, N'2026-10-07T20:00:00', N'2026-10-07T20:16:00', 5.50,  5, 2),
+            (7, 1, N'2026-10-20T13:05:00', N'2026-10-20T13:55:00', 11.00, 2, 3),
+            (8, 1, N'2026-11-12T20:00:00', N'2026-11-12T20:30:00', 2.00,  1, 4),
+            (9, 1, N'2026-11-10T09:30:00', N'2026-11-10T10:00:00', 3.50,  4, 5);
+        SET IDENTITY_INSERT dbo.[ATTEMPT] OFF;
+        SET @identity_on = NULL;
+
+        -- -------------------------------------------------------------------------
+        -- STUDENT_ANSWER (35 hàng)
+        -- Tuân thủ RB22, RB24, RB25:
+        --   - upload_time nằm trong khoảng [start_time, end_time] của ATTEMPT.
+        --   - Câu hỏi thuộc đúng đề thi (CONTAINS_QUESTION).
+        --   - Câu trắc nghiệm có choice_id thuộc đúng question_id; câu tự luận có choice_id = NULL
+        --     và 0 <= score_awarded <= điểm tối đa của câu hỏi trong đề thi.
+        -- -------------------------------------------------------------------------
+        DECLARE @q1_true  INT = (SELECT MIN(choice_id) FROM dbo.[CHOICE] WHERE question_id = 1  AND is_true = 1);
+        DECLARE @q2_true  INT = (SELECT MIN(choice_id) FROM dbo.[CHOICE] WHERE question_id = 2  AND is_true = 1);
+        DECLARE @q2_false INT = (SELECT MIN(choice_id) FROM dbo.[CHOICE] WHERE question_id = 2  AND is_true = 0);
+        DECLARE @q3_true  INT = (SELECT MIN(choice_id) FROM dbo.[CHOICE] WHERE question_id = 3  AND is_true = 1);
+        DECLARE @q3_false INT = (SELECT MIN(choice_id) FROM dbo.[CHOICE] WHERE question_id = 3  AND is_true = 0);
+        DECLARE @q4_true  INT = (SELECT MIN(choice_id) FROM dbo.[CHOICE] WHERE question_id = 4  AND is_true = 1);
+        DECLARE @q5_true  INT = (SELECT MIN(choice_id) FROM dbo.[CHOICE] WHERE question_id = 5  AND is_true = 1);
+        DECLARE @q5_false INT = (SELECT MIN(choice_id) FROM dbo.[CHOICE] WHERE question_id = 5  AND is_true = 0);
+        DECLARE @q6_true  INT = (SELECT MIN(choice_id) FROM dbo.[CHOICE] WHERE question_id = 6  AND is_true = 1);
+        DECLARE @q9_true  INT = (SELECT MIN(choice_id) FROM dbo.[CHOICE] WHERE question_id = 9  AND is_true = 1);
+        DECLARE @q10_true INT = (SELECT MIN(choice_id) FROM dbo.[CHOICE] WHERE question_id = 10 AND is_true = 1);
+        DECLARE @q11_true INT = (SELECT MIN(choice_id) FROM dbo.[CHOICE] WHERE question_id = 11 AND is_true = 1);
+        DECLARE @q11_false INT = (SELECT MIN(choice_id) FROM dbo.[CHOICE] WHERE question_id = 11 AND is_true = 0);
+
+        SET IDENTITY_INSERT dbo.[STUDENT_ANSWER] ON;
+        SET @identity_on = N'STUDENT_ANSWER';
+        INSERT INTO dbo.[STUDENT_ANSWER] ([ans_id], [answer_text], [file_submission_path], [upload_time], [score_awarded], [attempt_id], [question_id], [choice_id])
+        VALUES
+            -- Attempt 1 (SV1, Test 1: q1=1.0, q2=0.0, q3=1.0, q6=1.0 -> Tổng = 3.00)
+            (1,  NULL, NULL, N'2026-09-21T08:15:00', 1.00, 1, 1, @q1_true),
+            (2,  NULL, NULL, N'2026-09-21T08:20:00', 0.00, 1, 2, @q2_false),
+            (3,  NULL, NULL, N'2026-09-21T08:25:00', 1.00, 1, 3, @q3_true),
+            (4,  NULL, NULL, N'2026-09-21T08:30:00', 1.00, 1, 6, @q6_true),
+
+            -- Attempt 2 (SV1, Test 1: q1=1.0, q2=1.5, q3=1.0, q6=1.0 -> Tổng = 4.50)
+            (5,  NULL, NULL, N'2026-09-21T14:05:00', 1.00, 2, 1, @q1_true),
+            (6,  NULL, NULL, N'2026-09-21T14:10:00', 1.50, 2, 2, @q2_true),
+            (7,  NULL, NULL, N'2026-09-21T14:14:00', 1.00, 2, 3, @q3_true),
+            (8,  NULL, NULL, N'2026-09-21T14:18:00', 1.00, 2, 6, @q6_true),
+
+            -- Attempt 3 (SV2, Test 1: q1=1.0, q2=1.5, q3=0.0, q6=1.0 -> Tổng = 3.50)
+            (9,  NULL, NULL, N'2026-09-21T09:05:00', 1.00, 3, 1, @q1_true),
+            (10, NULL, NULL, N'2026-09-21T09:12:00', 1.50, 3, 2, @q2_true),
+            (11, NULL, NULL, N'2026-09-21T09:18:00', 0.00, 3, 3, @q3_false),
+            (12, NULL, NULL, N'2026-09-21T09:23:00', 1.00, 3, 6, @q6_true),
+
+            -- Attempt 4 (SV1, Test 2: q4=1.0, q5=0.0, q9=1.0, q11=1.0 -> Tổng = 3.00)
+            (13, NULL, NULL, N'2026-10-06T10:03:00', 1.00, 4, 4,  @q4_true),
+            (14, NULL, NULL, N'2026-10-06T10:07:00', 0.00, 4, 5,  @q5_false),
+            (15, NULL, NULL, N'2026-10-06T10:11:00', 1.00, 4, 9,  @q9_true),
+            (16, NULL, NULL, N'2026-10-06T10:14:00', 1.00, 4, 11, @q11_true),
+
+            -- Attempt 5 (SV1, Test 2: q4=1.0, q5=2.5, q9=1.0, q11=0.0 -> Tổng = 4.50)
+            (17, NULL, NULL, N'2026-10-08T15:04:00', 1.00, 5, 4,  @q4_true),
+            (18, NULL, NULL, N'2026-10-08T15:09:00', 2.50, 5, 5,  @q5_true),
+            (19, NULL, NULL, N'2026-10-08T15:13:00', 1.00, 5, 9,  @q9_true),
+            (20, NULL, NULL, N'2026-10-08T15:17:00', 0.00, 5, 11, @q11_false),
+
+            -- Attempt 6 (SV5, Test 2: q4=1.0, q5=2.5, q9=1.0, q11=1.0 -> Tổng = 5.50)
+            (21, NULL, NULL, N'2026-10-07T20:03:00', 1.00, 6, 4,  @q4_true),
+            (22, NULL, NULL, N'2026-10-07T20:08:00', 2.50, 6, 5,  @q5_true),
+            (23, NULL, NULL, N'2026-10-07T20:12:00', 1.00, 6, 9,  @q9_true),
+            (24, NULL, NULL, N'2026-10-07T20:15:00', 1.00, 6, 11, @q11_true),
+
+            -- Attempt 7 (SV2, Test 3: q1=1.0, q2=1.0, q5=2.0, q6=1.0, q7=3.5, q8=2.5 -> Tổng = 11.00)
+            (25, NULL, NULL, N'2026-10-20T13:10:00', 1.00, 7, 1, @q1_true),
+            (26, NULL, NULL, N'2026-10-20T13:15:00', 1.00, 7, 2, @q2_true),
+            (27, NULL, NULL, N'2026-10-20T13:20:00', 2.00, 7, 5, @q5_true),
+            (28, NULL, NULL, N'2026-10-20T13:25:00', 1.00, 7, 6, @q6_true),
+            (29, N'Thực thể mạnh có khóa chính độc lập, thực thể yếu phụ thuộc vào thực thể chủ và dùng khóa riêng phần kết hợp khóa chủ.',
+                 NULL, N'2026-10-20T13:40:00', 3.50, 7, 7, NULL),
+            (30, N'Tạo quan hệ mới có khóa chính là tổ hợp khóa chính của hai thực thể tham gia liên kết kèm các thuộc tính của liên kết.',
+                 NULL, N'2026-10-20T13:52:00', 2.50, 7, 8, NULL),
+
+            -- Attempt 8 (SV1, Test 4 - FILE_SUBMISSION: q12=2.0 -> Tổng = 2.00)
+            (31, N'Thuộc tính dẫn xuất được tính từ các thuộc tính khác, ví dụ final_score trong TAKES_TEST được tính từ score của bảng ATTEMPT.',
+                 N'/submissions/test_4/sv1_btl1.pdf', N'2026-11-12T20:25:00', 2.00, 8, 12, NULL),
+
+            -- Attempt 9 (SV4, Test 5: q3=1.0, q4=1.0, q10=0.5, q11=1.0 -> Tổng = 3.50)
+            (32, NULL, NULL, N'2026-11-10T09:35:00', 1.00, 9, 3,  @q3_true),
+            (33, NULL, NULL, N'2026-11-10T09:42:00', 1.00, 9, 4,  @q4_true),
+            (34, NULL, NULL, N'2026-11-10T09:50:00', 0.50, 9, 10, @q10_true),
+            (35, NULL, NULL, N'2026-11-10T09:58:00', 1.00, 9, 11, @q11_true);
+        SET IDENTITY_INSERT dbo.[STUDENT_ANSWER] OFF;
+        SET @identity_on = NULL;
+    END;
+
+    COMMIT TRANSACTION;
+    PRINT N'TV5: Da insert thanh cong du lieu mau cho 5 bang: [POST], [COMMENT], [TAKES_TEST], [ATTEMPT], [STUDENT_ANSWER].';
+END TRY
+BEGIN CATCH
+    IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
+    IF @identity_on = N'POST'           SET IDENTITY_INSERT dbo.[POST] OFF;
+    IF @identity_on = N'COMMENT'        SET IDENTITY_INSERT dbo.[COMMENT] OFF;
+    IF @identity_on = N'ATTEMPT'        SET IDENTITY_INSERT dbo.[ATTEMPT] OFF;
+    IF @identity_on = N'STUDENT_ANSWER' SET IDENTITY_INSERT dbo.[STUDENT_ANSWER] OFF;
+    THROW;
+END CATCH;
 GO
