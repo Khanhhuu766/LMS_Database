@@ -324,5 +324,88 @@ GO
 -- Bảng: [TAKES_TEST], [ATTEMPT], [STUDENT_ANSWER], [POST], [COMMENT]
 -- Quy ước: TV5 CHỈ VIẾT TRONG KHUNG NÀY, KHÔNG SỬA RA NGOÀI KHUNG
 -- =================================================================================
--- TODO
+SET NOCOUNT ON;
+SET XACT_ABORT ON;
+
+DECLARE @identity_on SYSNAME = NULL;
+BEGIN TRY
+    BEGIN TRANSACTION;
+
+    -- -----------------------------------------------------------------------------
+    -- POST (6 hàng)
+    -- Tuân thủ RB3, RB28: Chỉ Giảng viên dạy lớp đó hoặc Sinh viên đã đăng ký lớp
+    -- và có is_allowed_to_discuss = 1 trong ENROLLS mới được đăng bài;
+    -- thời gian đăng bài (post_start) nằm trong học kỳ của lớp.
+    -- -----------------------------------------------------------------------------
+    SET IDENTITY_INSERT dbo.[POST] ON;
+    SET @identity_on = N'POST';
+    INSERT INTO dbo.[POST] ([post_id], [post_name], [post_description], [post_start], [ua_id], [class_id])
+    VALUES
+        (1, N'Thông báo quy định làm Bài tập lớn môn Cơ sở dữ liệu',
+            N'Các nhóm lưu ý giữ nguyên 25 bảng từ BTL1, kiểm tra kỹ các ràng buộc toàn vẹn bằng CHECK trước khi viết Trigger.',
+            N'2026-09-10T09:00:00', 1011, 3),
+        (2, N'Thắc mắc về chuyển đổi thực thể yếu CHAPTER và TOPIC sang lược đồ quan hệ',
+            N'Thầy và các bạn cho em hỏi khóa chính của TOPIC gồm những thuộc tính nào khi ánh xạ từ EERD sang bảng ạ?',
+            N'2026-09-23T14:15:00', 1001, 3),
+        (3, N'Hỏi về sự khác biệt giữa kiểm soát luồng và kiểm soát tắc nghẽn trong TCP',
+            N'Mình đang đọc slide Chương 2 nhưng chưa phân biệt rõ cửa sổ nhận (rwnd) và cửa sổ tắc nghẽn (cwnd).',
+            N'2026-10-07T10:30:00', 1004, 4),
+        (4, N'Hướng dẫn cài đặt phần mềm mô phỏng mạch logic Chương 2',
+            N'Các em tải file mô phỏng mạch cộng đã đính kèm trong Topic 1 của Chương 2 và chạy thử trước buổi học tuần tới.',
+            N'2026-10-15T08:00:00', 1012, 5),
+        (5, N'Lỗi tràn ngăn xếp khi gọi hàm đệ quy không có điều kiện dừng',
+            N'Khi em chạy bài tập tính giai thừa bằng đệ quy với n âm thì chương trình bị dừng đột ngột, nhờ thầy và các bạn giải thích giúp ạ.',
+            N'2025-09-21T19:00:00', 1002, 1),
+        (6, N'So sánh độ phức tạp chèn đầu và chèn cuối trong danh sách liên kết đơn',
+            N'Nếu chỉ quản lý con trỏ head mà không có con trỏ tail thì thao tác chèn cuối tốn O(n) đúng không ạ?',
+            N'2026-02-26T15:20:00', 1001, 2);
+    SET IDENTITY_INSERT dbo.[POST] OFF;
+    SET @identity_on = NULL;
+
+    -- -----------------------------------------------------------------------------
+    -- COMMENT (10 hàng)
+    -- Tuân thủ RB3, RB28 & RB29:
+    --   - Người bình luận phải thuộc lớp của bài đăng và có quyền thảo luận
+    --     (Lưu ý: SV4 / ua_id = 1004 bị khóa thảo luận ở lớp 2 nên không bình luận ở lớp 2).
+    --   - comment_start >= post_start (và >= comment_start của bình luận cha).
+    --   - Bình luận phản hồi (parent_comment_id) phải thuộc cùng post_id với bình luận gốc.
+    -- -----------------------------------------------------------------------------
+    SET IDENTITY_INSERT dbo.[COMMENT] ON;
+    SET @identity_on = N'COMMENT';
+    INSERT INTO dbo.[COMMENT] ([comment_id], [comment_content], [comment_start], [post_id], [ua_id], [parent_comment_id])
+    VALUES
+        (1,  N'Dạ thầy cho em hỏi mỗi bảng cần tối thiểu bao nhiêu dòng dữ liệu mẫu ạ?',
+             N'2026-09-10T09:30:00', 1, 1001, NULL),
+        (2,  N'Mỗi bảng cần tối thiểu 5 dòng dữ liệu có ý nghĩa thực tế nhé An.',
+             N'2026-09-10T09:45:00', 1, 1011, 1),
+        (3,  N'Dạ nhóm em đã nắm rõ thông tin, cảm ơn thầy ạ!',
+             N'2026-09-10T10:10:00', 1, 1002, 2),
+        (4,  N'Vì TOPIC là thực thể yếu phụ thuộc vào CHAPTER nên khóa chính sẽ là (class_id, chapter_id, topic_id) đó bạn.',
+             N'2026-09-23T14:40:00', 2, 1004, NULL),
+        (5,  N'Bạn Dũng trả lời chính xác rồi, các em nhớ khai báo khóa ngoại tổ hợp tham chiếu về CHAPTER nhé.',
+             N'2026-09-23T15:05:00', 2, 1011, 4),
+        (6,  N'Kiểm soát luồng bảo vệ bộ đệm của bên nhận (dùng rwnd), còn kiểm soát tắc nghẽn bảo vệ mạng khỏi quá tải (dùng cwnd).',
+             N'2026-10-07T11:00:00', 3, 1011, NULL),
+        (7,  N'Vậy lượng dữ liệu gửi đi tối đa tại một thời điểm sẽ bằng min(rwnd, cwnd) đúng không thầy?',
+             N'2026-10-07T11:25:00', 3, 1001, 6),
+        (8,  N'Dạ cô ơi em đã tải file mô phỏng mạch cộng 4-bit về và chạy thử thành công rồi ạ.',
+             N'2026-10-15T09:15:00', 4, 1003, NULL),
+        (9,  N'Bạn cần kiểm tra điều kiện n >= 0 trước khi gọi đệ quy, nếu chỉ dừng ở n == 0 thì với n âm hàm sẽ gọi vô hạn.',
+             N'2025-09-21T19:30:00', 5, 1005, NULL),
+        (10, N'Đúng rồi bạn, vì phải duyệt từ head đến nút cuối cùng mới nối nút mới vào được.',
+             N'2026-02-26T16:00:00', 6, 1002, NULL);
+    SET IDENTITY_INSERT dbo.[COMMENT] OFF;
+    SET @identity_on = NULL;
+
+    -- TODO: Bổ sung dữ liệu cho [TAKES_TEST], [ATTEMPT], [STUDENT_ANSWER] sau khi TV4 hoàn tất Cụm 3 ([TEST], [QUESTION], [CHOICE])
+
+    COMMIT TRANSACTION;
+    PRINT N'TV5: Da insert thanh cong du lieu mau cho 2 bang: [POST], [COMMENT].';
+END TRY
+BEGIN CATCH
+    IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
+    IF @identity_on = N'POST'    SET IDENTITY_INSERT dbo.[POST] OFF;
+    IF @identity_on = N'COMMENT' SET IDENTITY_INSERT dbo.[COMMENT] OFF;
+    THROW;
+END CATCH;
 GO
