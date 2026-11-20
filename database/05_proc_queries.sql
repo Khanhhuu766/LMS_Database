@@ -8,62 +8,65 @@
 --   - Thủ tục 1: Truy vấn từ 2 bảng trở lên, có mệnh đề WHERE và ORDER BY.
 --   - Thủ tục 2: Truy vấn liên kết từ 2 bảng trở lên, có Aggregate Function,
 --                GROUP BY, HAVING, WHERE và ORDER BY.
---   - Bắt buộc có ít nhất 1 thủ tục liên quan đến bảng dữ liệu đã chọn ở mục 2.1.
+--   - Bắt buộc có ít nhất 1 thủ tục liên quan đến bảng dữ liệu đã chọn ở mục 2.1 (bảng POST).
 -- =================================================================================
 
 USE [LMS_DB];
 GO
 
 -- ---------------------------------------------------------------------------------
--- THỦ TỤC 1: dbo.usp_Test_Search - Tìm kiếm bài kiểm tra
---   Bảng chính: TEST. Nối: CLASS, SUBJECT, CHAPTER, CONTAINS_QUESTION, QUESTION.
---   Có WHERE + ORDER BY. Tham số NULL = không lọc theo tiêu chí đó.
---   Hiển thị kèm số câu hỏi và tổng điểm tối đa của bài (ưu tiên custom_score
---   nếu có, ngược lại dùng max_score mặc định của câu hỏi).
+-- THỦ TỤC 1: dbo.usp_Post_Search - Tìm kiếm bài đăng trong diễn đàn lớp học
+--   Liên quan bảng đã chọn ở Mục 2.1: [POST].
+--   Nối: POST - USER (tác giả) - CLASS - STUDENT/LECTURER/ADMIN (vai trò tác giả)
+--        và COMMENT (đếm bình luận). Có WHERE + ORDER BY.
+--   Tham số NULL = không lọc theo tiêu chí đó.
 -- ---------------------------------------------------------------------------------
-CREATE OR ALTER PROCEDURE dbo.usp_Test_Search
-    @class_id        INT           = NULL,   -- lọc theo lớp học
-    @test_type       NVARCHAR(30)  = NULL,   -- ONLINE / FILE_SUBMISSION
-    @grading_method  NVARCHAR(10)  = NULL,   -- HIGHEST / AVERAGE / FIRST / LATEST
-    @from_date       DATETIME      = NULL,   -- bài có test_start >= mốc này
-    @to_date         DATETIME      = NULL,   -- bài có test_start trong ngày này trở về trước
-    @keyword         NVARCHAR(200) = NULL    -- tìm trong tên bài kiểm tra
+CREATE OR ALTER PROCEDURE dbo.usp_Post_Search
+    @class_id       INT           = NULL,   -- lọc theo lớp học
+    @keyword        NVARCHAR(200) = NULL,   -- tìm trong tiêu đề hoặc nội dung bài đăng
+    @author         NVARCHAR(100) = NULL,   -- tìm theo họ tên hoặc tên đăng nhập của tác giả
+    @from_date      DATETIME      = NULL,   -- bài đăng từ thời điểm này
+    @to_date        DATETIME      = NULL,   -- bài đăng đến hết ngày này
+    @min_comments   INT           = NULL    -- chỉ lấy bài có ít nhất ngần này bình luận
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    SELECT  t.test_id,
-            t.test_name,
-            t.test_type,
+    SELECT  p.post_id,
+            p.post_name,
+            CAST(LEFT(p.post_description, 100) AS NVARCHAR(100)) AS noi_dung_tom_tat,
+            p.post_start,
             c.class_name,
-            s.subject_name,
-            ch.chapter_name,
-            t.test_start,
-            t.test_end,
-            t.test_timer,
-            t.max_attempts,
-            t.grading_method,
-            qs.so_cau_hoi,
-            qs.tong_diem_toi_da
-    FROM [TEST] AS t
-         LEFT JOIN [CLASS]   AS c  ON c.class_id   = t.class_id
-         LEFT JOIN [SUBJECT] AS s  ON s.subject_id = c.subject_id
-         LEFT JOIN [CHAPTER] AS ch ON ch.class_id   = t.class_id
-                                  AND ch.chapter_id = t.chapter_id
+            u.ua_username,
+            CONCAT(u.last_name, N' ', COALESCE(u.middle_name + N' ', N''), u.first_name) AS tac_gia,
+            CASE WHEN l.user_id  IS NOT NULL THEN N'Giảng viên'
+                 WHEN st.user_id IS NOT NULL THEN N'Sinh viên'
+                 WHEN ad.user_id IS NOT NULL THEN N'Quản trị viên'
+                 ELSE N'Không xác định' END                       AS vai_tro,
+            qs.so_binh_luan,
+            qs.binh_luan_moi_nhat
+    FROM [POST] AS p
+         LEFT JOIN [USER]     AS u  ON u.ua_id   = p.ua_id
+         LEFT JOIN [CLASS]    AS c  ON c.class_id = p.class_id
+         LEFT JOIN [STUDENT]  AS st ON st.user_id = u.user_id
+         LEFT JOIN [LECTURER] AS l  ON l.user_id  = u.user_id
+         LEFT JOIN [ADMIN]    AS ad ON ad.user_id = u.user_id
          OUTER APPLY (
-             SELECT COUNT(*) AS so_cau_hoi,
-                    SUM(COALESCE(cq.custom_score, q.max_score)) AS tong_diem_toi_da
-             FROM [CONTAINS_QUESTION] AS cq
-                  JOIN [QUESTION] AS q ON q.question_id = cq.question_id
-             WHERE cq.test_id = t.test_id
+             SELECT COUNT(*)              AS so_binh_luan,
+                    MAX(cm.comment_start) AS binh_luan_moi_nhat
+             FROM [COMMENT] AS cm
+             WHERE cm.post_id = p.post_id
          ) AS qs
-    WHERE (@class_id       IS NULL OR t.class_id       = @class_id)
-      AND (@test_type      IS NULL OR t.test_type      = @test_type)
-      AND (@grading_method IS NULL OR t.grading_method = @grading_method)
-      AND (@from_date      IS NULL OR t.test_start    >= @from_date)
-      AND (@to_date        IS NULL OR t.test_start     < DATEADD(DAY, 1, @to_date))
-      AND (@keyword        IS NULL OR t.test_name   LIKE N'%' + @keyword + N'%')
-    ORDER BY t.test_start DESC, t.test_id;
+    WHERE (@class_id     IS NULL OR p.class_id = @class_id)
+      AND (@keyword      IS NULL OR p.post_name        LIKE N'%' + @keyword + N'%'
+                                 OR p.post_description LIKE N'%' + @keyword + N'%')
+      AND (@author       IS NULL OR u.ua_username LIKE N'%' + @author + N'%'
+                                 OR CONCAT(u.last_name, N' ', COALESCE(u.middle_name + N' ', N''), u.first_name)
+                                        LIKE N'%' + @author + N'%')
+      AND (@from_date    IS NULL OR p.post_start >= @from_date)
+      AND (@to_date      IS NULL OR p.post_start  < DATEADD(DAY, 1, @to_date))
+      AND (@min_comments IS NULL OR qs.so_binh_luan >= @min_comments)
+    ORDER BY p.post_start DESC, p.post_id;
 END;
 GO
 
