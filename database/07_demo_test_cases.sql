@@ -1,4 +1,4 @@
-﻿-- =================================================================================
+-- =================================================================================
 -- KỊCH BẢN KIỂM THỬ & MINH HỌA KHI BÁO CÁO (DEMO TEST CASES)
 -- Yêu cầu đề bài :
 --   - Chuẩn bị sẵn các câu lệnh và dữ liệu minh họa cho việc kiểm tra Trigger (2.2),
@@ -10,7 +10,115 @@
 -- PHẦN CỦA TV1: KIỂM THỬ MỤC 2.1 - 3 THỦ TỤC THÊM (INSERT), SỬA (UPDATE), XÓA (DELETE)
 -- Quy ước: TV1 CHỈ VIẾT TRONG KHUNG NÀY, KHÔNG SỬA RA NGOÀI KHUNG
 -- =================================================================================
--- TODO
+USE [LMS_DB];
+GO
+SET NOCOUNT ON;
+
+PRINT N'=== [TV1 - MỤC 2.1] BẮT ĐẦU KIỂM THỬ CRUD TRÊN BẢNG [POST] ===';
+
+DECLARE @demo_post_id INT = NULL;
+
+BEGIN TRY
+    -- 1. Kiểm tra INSERT thất bại: Tên bài đăng để trống (lỗi 51001)
+    BEGIN TRY
+        EXEC dbo.usp_Post_Insert @PostName = N'   ', @UaId = 1001, @PostDescription = N'Test', @ClassId = 3;
+        THROW 51090, N'FAIL 1: Khong chan ten bai dang rong.', 1;
+    END TRY
+    BEGIN CATCH
+        IF ERROR_NUMBER() = 51001
+            PRINT N'PASS 1: Chan ten bai dang rong (51001): ' + ERROR_MESSAGE();
+        ELSE THROW;
+    END CATCH;
+
+    -- 2. Kiểm tra INSERT thất bại: Người dùng không tồn tại (lỗi 51004)
+    BEGIN TRY
+        EXEC dbo.usp_Post_Insert @PostName = N'Test user', @UaId = 99999, @PostDescription = N'Test', @ClassId = 3;
+        THROW 51091, N'FAIL 2: Khong chan ua_id khong ton tai.', 1;
+    END TRY
+    BEGIN CATCH
+        IF ERROR_NUMBER() = 51004
+            PRINT N'PASS 2: Chan ua_id khong ton tai (51004): ' + ERROR_MESSAGE();
+        ELSE THROW;
+    END CATCH;
+
+    -- 3. Kiểm tra INSERT thất bại: SV4 (ua_id = 1004) bị khóa thảo luận ở lớp 2 (lỗi 51007)
+    BEGIN TRY
+        EXEC dbo.usp_Post_Insert @PostName = N'Test bi khoa thao luan', @UaId = 1004, @PostDescription = N'Test', @ClassId = 2;
+        THROW 51092, N'FAIL 3: Khong chan SV bi khoa thao luan trong lop 2.', 1;
+    END TRY
+    BEGIN CATCH
+        IF ERROR_NUMBER() = 51007
+            PRINT N'PASS 3: Chan SV4 dang bai trong lop 2 do is_allowed_to_discuss = 0 (51007).';
+        ELSE THROW;
+    END CATCH;
+
+    -- 4. Kiểm tra INSERT thành công: SV1 (ua_id = 1001) đăng bài vào lớp 3
+    DECLARE @ins_out TABLE (post_id INT, result_message NVARCHAR(200));
+    INSERT INTO @ins_out
+    EXEC dbo.usp_Post_Insert
+        @PostName        = N'TV1 Demo - Thao luan BTL2',
+        @UaId            = 1001,
+        @PostDescription = N'Noi dung bai dang demo cua TV1.',
+        @ClassId         = 3;
+
+    SELECT TOP (1) @demo_post_id = post_id FROM @ins_out;
+    IF @demo_post_id IS NOT NULL
+        PRINT N'PASS 4: INSERT thanh cong bai dang moi (post_id = ' + CAST(@demo_post_id AS NVARCHAR(20)) + N').';
+    ELSE
+        THROW 51093, N'FAIL 4: INSERT khong tra ve post_id.', 1;
+
+    -- 5. Kiểm tra UPDATE thất bại: Người khác (ua_id = 1002) sửa bài của 1001 (lỗi 51017)
+    BEGIN TRY
+        EXEC dbo.usp_Post_Update
+            @PostId          = @demo_post_id,
+            @RequesterUaId   = 1002,
+            @PostName        = N'Sua trai phep',
+            @PostDescription = N'Test';
+        THROW 51094, N'FAIL 5: Khong chan nguoi khac sua bai dang.', 1;
+    END TRY
+    BEGIN CATCH
+        IF ERROR_NUMBER() = 51017
+            PRINT N'PASS 5: Chan nguoi khong phai tac gia sua bai (51017).';
+        ELSE THROW;
+    END CATCH;
+
+    -- 6. Kiểm tra UPDATE thành công: Chính tác giả (ua_id = 1001) cập nhật bài
+    DECLARE @upd_out TABLE (post_id INT, result_message NVARCHAR(200));
+    INSERT INTO @upd_out
+    EXEC dbo.usp_Post_Update
+        @PostId          = @demo_post_id,
+        @RequesterUaId   = 1001,
+        @PostName        = N'TV1 Demo - Thao luan BTL2 (Da cap nhat)',
+        @PostDescription = N'Noi dung da duoc tac gia cap nhat.';
+    PRINT N'PASS 6: UPDATE thanh cong boi chinh tac gia.';
+
+    -- 7. Kiểm tra DELETE thất bại: Không cho xóa bài đã có bình luận (post_id = 1 của 1011, lỗi 51026)
+    BEGIN TRY
+        EXEC dbo.usp_Post_Delete @PostId = 1, @RequesterUaId = 1011;
+        THROW 51095, N'FAIL 7: Khong chan xoa bai dang da co binh luan.', 1;
+    END TRY
+    BEGIN CATCH
+        IF ERROR_NUMBER() = 51026
+            PRINT N'PASS 7: Chan xoa bai dang da co binh luan de bao toan lich su (51026).';
+        ELSE THROW;
+    END CATCH;
+
+    -- 8. Kiểm tra DELETE thành công: Tác giả (ua_id = 1001) xóa bài demo vừa tạo (chưa có bình luận)
+    DECLARE @del_out TABLE (post_id INT, result_message NVARCHAR(200));
+    INSERT INTO @del_out
+    EXEC dbo.usp_Post_Delete @PostId = @demo_post_id, @RequesterUaId = 1001;
+    SET @demo_post_id = NULL;
+    PRINT N'PASS 8: DELETE thanh cong bai dang chua co binh luan (da don sach du lieu demo).';
+
+    PRINT N'=== [TV1 - MỤC 2.1] HOÀN TẤT KIỂM THỬ 8/8 CASE THÀNH CÔNG ===';
+END TRY
+BEGIN CATCH
+    PRINT N'DEMO TV1 GAP LOI: ' + ERROR_MESSAGE();
+    IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
+    IF @demo_post_id IS NOT NULL
+        DELETE FROM dbo.[POST] WHERE post_id = @demo_post_id;
+    THROW;
+END CATCH;
 GO
 
 -- =================================================================================
@@ -138,7 +246,192 @@ GO
 -- PHẦN CỦA TV3: KIỂM THỬ MỤC 2.2.2 - TRIGGER TÍNH THUỘC TÍNH DẪN XUẤT
 -- Quy ước: TV3 CHỈ VIẾT TRONG KHUNG NÀY, KHÔNG SỬA RA NGOÀI KHUNG
 -- =================================================================================
--- TODO
+-- Điều kiện: đã chạy 01, 02 và 04 (Section TV3 tạo 3 trigger + hàm dbo.fn_tv3_ComputeFinalScore).
+-- Kịch bản tự tạo 1 bài kiểm tra + 2 câu hỏi riêng, chạy các thao tác DML rồi kiểm tra
+-- ATTEMPT.score (RB25) và TAKES_TEST.final_score (RB26) được trigger tính đúng.
+-- Cuối kịch bản xóa toàn bộ dữ liệu demo, không ảnh hưởng dữ liệu mẫu và các Section khác.
+USE [LMS_DB];
+GO
+SET NOCOUNT ON;
+
+PRINT N'=== [TV3 - MỤC 2.2.2] BẮT ĐẦU KIỂM THỬ TRIGGER THUỘC TÍNH DẪN XUẤT ===';
+
+DECLARE @student_id INT, @class_id INT;
+DECLARE @test_id INT = NULL, @q1 INT = NULL, @q2 INT = NULL;
+DECLARE @a1 INT = NULL, @a2 INT = NULL, @ans_q1_a2 INT = NULL;
+DECLARE @score DECIMAL(5,2), @final DECIMAL(5,2);
+
+-- Lấy 1 sinh viên đã đăng ký lớp để bài kiểm tra demo thuộc đúng lớp của sinh viên (RB3)
+SELECT TOP (1) @student_id = e.student_id, @class_id = e.class_id
+FROM dbo.[ENROLLS] AS e
+ORDER BY e.student_id, e.class_id;
+
+IF @student_id IS NULL
+    THROW 52000, N'Can it nhat 1 dong ENROLLS de chay demo TV3.', 1;
+
+BEGIN TRY
+    -- Chuẩn bị: bài kiểm tra HIGHEST, tối đa 3 lần làm, và 2 câu hỏi tự luận
+    INSERT INTO dbo.[TEST] (test_name, test_type, test_start, test_end, test_timer,
+                            max_attempts, grading_method, class_id)
+    VALUES (N'TV3 demo - thuoc tinh dan xuat', N'ONLINE',
+            DATEADD(HOUR, -2, GETDATE()), DATEADD(HOUR, 2, GETDATE()), 60, 3, N'HIGHEST', @class_id);
+    SET @test_id = CONVERT(INT, SCOPE_IDENTITY());
+
+    INSERT INTO dbo.[QUESTION] (question_type, question_content, max_score)
+    VALUES (N'ESSAY', N'TV3 demo - cau hoi 1', 5.00);
+    SET @q1 = CONVERT(INT, SCOPE_IDENTITY());
+
+    INSERT INTO dbo.[QUESTION] (question_type, question_content, max_score)
+    VALUES (N'ESSAY', N'TV3 demo - cau hoi 2', 5.00);
+    SET @q2 = CONVERT(INT, SCOPE_IDENTITY());
+
+    INSERT INTO dbo.[CONTAINS_QUESTION] (test_id, question_id) VALUES (@test_id, @q1), (@test_id, @q2);
+
+    -- CASE 1: Thêm lần làm 1 và cố ý nhập tay score = 9.99
+    --         -> trigger đưa score về tổng câu trả lời (chưa có câu nào -> NULL)
+    --         -> tự tạo dòng TAKES_TEST với final_score = NULL
+    INSERT INTO dbo.[ATTEMPT] (attempt_index, start_time, score, student_id, test_id)
+    VALUES (1, DATEADD(MINUTE, -90, GETDATE()), 9.99, @student_id, @test_id);
+    SET @a1 = CONVERT(INT, SCOPE_IDENTITY());
+
+    SELECT @score = score FROM dbo.[ATTEMPT] WHERE attempt_id = @a1;
+    IF @score IS NULL
+       AND EXISTS (SELECT 1 FROM dbo.[TAKES_TEST]
+                   WHERE student_id = @student_id AND test_id = @test_id AND final_score IS NULL)
+        PRINT N'PASS 1: Nhap tay score bi bo qua (NULL), TAKES_TEST tu tao voi final_score = NULL.';
+    ELSE
+        THROW 52001, N'FAIL 1: ATTEMPT.score / TAKES_TEST chua dung sau khi them lan lam.', 1;
+
+    -- CASE 2: Chấm 2 câu của lần 1 (2.00 + 3.50) -> score = 5.50, final (HIGHEST) = 5.50
+    INSERT INTO dbo.[STUDENT_ANSWER] (answer_text, upload_time, score_awarded, attempt_id, question_id)
+    VALUES (N'Bai lam lan 1 - cau 1', DATEADD(MINUTE, -85, GETDATE()), 2.00, @a1, @q1),
+           (N'Bai lam lan 1 - cau 2', DATEADD(MINUTE, -80, GETDATE()), 3.50, @a1, @q2);
+    UPDATE dbo.[ATTEMPT] SET end_time = DATEADD(MINUTE, -75, GETDATE()) WHERE attempt_id = @a1;
+
+    SELECT @score = score FROM dbo.[ATTEMPT] WHERE attempt_id = @a1;
+    SELECT @final = final_score FROM dbo.[TAKES_TEST] WHERE student_id = @student_id AND test_id = @test_id;
+    IF @score = 5.50 AND @final = 5.50
+        PRINT N'PASS 2: INSERT cau tra loi -> ATTEMPT.score = 5.50, final_score (HIGHEST) = 5.50.';
+    ELSE
+        THROW 52002, N'FAIL 2: Ky vong score = 5.50 va final_score = 5.50.', 1;
+
+    -- CASE 3: Lần làm 2 được 4.00 + 4.00 = 8.00 -> final (HIGHEST) = 8.00
+    INSERT INTO dbo.[ATTEMPT] (attempt_index, start_time, student_id, test_id)
+    VALUES (2, DATEADD(MINUTE, -60, GETDATE()), @student_id, @test_id);
+    SET @a2 = CONVERT(INT, SCOPE_IDENTITY());
+
+    INSERT INTO dbo.[STUDENT_ANSWER] (answer_text, upload_time, score_awarded, attempt_id, question_id)
+    VALUES (N'Bai lam lan 2 - cau 1', DATEADD(MINUTE, -55, GETDATE()), 4.00, @a2, @q1);
+    SET @ans_q1_a2 = CONVERT(INT, SCOPE_IDENTITY());
+    INSERT INTO dbo.[STUDENT_ANSWER] (answer_text, upload_time, score_awarded, attempt_id, question_id)
+    VALUES (N'Bai lam lan 2 - cau 2', DATEADD(MINUTE, -50, GETDATE()), 4.00, @a2, @q2);
+
+    SELECT @score = score FROM dbo.[ATTEMPT] WHERE attempt_id = @a2;
+    SELECT @final = final_score FROM dbo.[TAKES_TEST] WHERE student_id = @student_id AND test_id = @test_id;
+    IF @score = 8.00 AND @final = 8.00
+        PRINT N'PASS 3: Lan 2 = 8.00 -> final_score (HIGHEST) = MAX(5.50, 8.00) = 8.00.';
+    ELSE
+        THROW 52003, N'FAIL 3: Ky vong score lan 2 = 8.00 va final_score = 8.00.', 1;
+
+    -- CASE 4: Giảng viên chấm lại câu 1 của lần 2: 4.00 -> 1.00
+    --         -> lần 2 = 5.00, final (HIGHEST) = MAX(5.50, 5.00) = 5.50
+    UPDATE dbo.[STUDENT_ANSWER] SET score_awarded = 1.00 WHERE ans_id = @ans_q1_a2;
+
+    SELECT @score = score FROM dbo.[ATTEMPT] WHERE attempt_id = @a2;
+    SELECT @final = final_score FROM dbo.[TAKES_TEST] WHERE student_id = @student_id AND test_id = @test_id;
+    IF @score = 5.00 AND @final = 5.50
+        PRINT N'PASS 4: UPDATE score_awarded -> lan 2 = 5.00, final_score quay ve 5.50.';
+    ELSE
+        THROW 52004, N'FAIL 4: Ky vong score lan 2 = 5.00 va final_score = 5.50.', 1;
+
+    -- CASE 5: Cố ý sửa tay ATTEMPT.score = 10.00 -> trigger đưa về 5.00, final không đổi
+    UPDATE dbo.[ATTEMPT] SET score = 10.00 WHERE attempt_id = @a2;
+
+    SELECT @score = score FROM dbo.[ATTEMPT] WHERE attempt_id = @a2;
+    SELECT @final = final_score FROM dbo.[TAKES_TEST] WHERE student_id = @student_id AND test_id = @test_id;
+    IF @score = 5.00 AND @final = 5.50
+        PRINT N'PASS 5: Sua tay ATTEMPT.score bi tinh lai = 5.00 (khong nhap truc tiep duoc).';
+    ELSE
+        THROW 52005, N'FAIL 5: ATTEMPT.score bi sua tay ma khong duoc tinh lai.', 1;
+
+    -- CASE 6: Đổi grading_method -> final_score tính lại theo phương thức mới
+    --         (lần 1 = 5.50, lần 2 = 5.00)
+    UPDATE dbo.[TEST] SET grading_method = N'AVERAGE' WHERE test_id = @test_id;
+    SELECT @final = final_score FROM dbo.[TAKES_TEST] WHERE student_id = @student_id AND test_id = @test_id;
+    IF @final = 5.25 PRINT N'PASS 6a: AVERAGE -> (5.50 + 5.00) / 2 = 5.25.';
+    ELSE THROW 52006, N'FAIL 6a: Ky vong final_score AVERAGE = 5.25.', 1;
+
+    UPDATE dbo.[TEST] SET grading_method = N'FIRST' WHERE test_id = @test_id;
+    SELECT @final = final_score FROM dbo.[TAKES_TEST] WHERE student_id = @student_id AND test_id = @test_id;
+    IF @final = 5.50 PRINT N'PASS 6b: FIRST -> lan 1 = 5.50.';
+    ELSE THROW 52007, N'FAIL 6b: Ky vong final_score FIRST = 5.50.', 1;
+
+    UPDATE dbo.[TEST] SET grading_method = N'LATEST' WHERE test_id = @test_id;
+    SELECT @final = final_score FROM dbo.[TAKES_TEST] WHERE student_id = @student_id AND test_id = @test_id;
+    IF @final = 5.00 PRINT N'PASS 6c: LATEST -> lan 2 = 5.00.';
+    ELSE THROW 52008, N'FAIL 6c: Ky vong final_score LATEST = 5.00.', 1;
+
+    -- CASE 7: Xóa 1 câu trả lời của lần 2 (câu 2 = 4.00) -> lần 2 = 1.00, final (LATEST) = 1.00
+    DELETE FROM dbo.[STUDENT_ANSWER] WHERE attempt_id = @a2 AND question_id = @q2;
+
+    SELECT @score = score FROM dbo.[ATTEMPT] WHERE attempt_id = @a2;
+    SELECT @final = final_score FROM dbo.[TAKES_TEST] WHERE student_id = @student_id AND test_id = @test_id;
+    IF @score = 1.00 AND @final = 1.00
+        PRINT N'PASS 7: DELETE cau tra loi -> lan 2 = 1.00, final_score (LATEST) = 1.00.';
+    ELSE
+        THROW 52009, N'FAIL 7: Ky vong score lan 2 = 1.00 va final_score = 1.00.', 1;
+
+    -- Bảng minh họa trực quan trước khi xóa lần làm 2
+    SELECT a.attempt_id, a.attempt_index, a.score AS attempt_score,
+           (SELECT SUM(sa.score_awarded) FROM dbo.[STUDENT_ANSWER] AS sa
+            WHERE sa.attempt_id = a.attempt_id) AS tong_diem_cau_tra_loi
+    FROM dbo.[ATTEMPT] AS a
+    WHERE a.test_id = @test_id
+    ORDER BY a.attempt_index;
+
+    -- CASE 8: Xóa lần làm 2 -> chỉ còn lần 1, final (LATEST) = 5.50
+    DELETE FROM dbo.[STUDENT_ANSWER] WHERE attempt_id = @a2;
+    DELETE FROM dbo.[ATTEMPT] WHERE attempt_id = @a2;
+    SET @a2 = NULL;
+
+    SELECT @final = final_score FROM dbo.[TAKES_TEST] WHERE student_id = @student_id AND test_id = @test_id;
+    IF @final = 5.50
+        PRINT N'PASS 8: DELETE lan lam 2 -> final_score (LATEST) = lan 1 = 5.50.';
+    ELSE
+        THROW 52010, N'FAIL 8: Ky vong final_score = 5.50 sau khi xoa lan 2.', 1;
+
+    SELECT tt.student_id, tt.test_id, t.grading_method, tt.final_score
+    FROM dbo.[TAKES_TEST] AS tt
+    INNER JOIN dbo.[TEST] AS t ON t.test_id = tt.test_id
+    WHERE tt.test_id = @test_id;
+
+    -- Dọn dữ liệu demo (TAKES_TEST, CONTAINS_QUESTION tự xóa theo ON DELETE CASCADE của TEST/QUESTION)
+    DELETE FROM dbo.[STUDENT_ANSWER] WHERE question_id IN (@q1, @q2);
+    DELETE FROM dbo.[ATTEMPT] WHERE test_id = @test_id;
+    DELETE FROM dbo.[TAKES_TEST] WHERE test_id = @test_id;
+    DELETE FROM dbo.[TEST] WHERE test_id = @test_id;
+    DELETE FROM dbo.[QUESTION] WHERE question_id IN (@q1, @q2);
+    SET @test_id = NULL;
+
+    PRINT N'=== [TV3 - MỤC 2.2.2] HOAN TAT: 8/8 PASS, da xoa du lieu demo. ===';
+END TRY
+BEGIN CATCH
+    PRINT N'DEMO TV3 GAP LOI: ' + ERROR_MESSAGE();
+    IF XACT_STATE() <> 0
+        ROLLBACK TRANSACTION;
+
+    IF @q1 IS NOT NULL OR @q2 IS NOT NULL
+        DELETE FROM dbo.[STUDENT_ANSWER] WHERE question_id IN (@q1, @q2);
+    IF @test_id IS NOT NULL
+    BEGIN
+        DELETE FROM dbo.[ATTEMPT] WHERE test_id = @test_id;
+        DELETE FROM dbo.[TAKES_TEST] WHERE test_id = @test_id;
+        DELETE FROM dbo.[TEST] WHERE test_id = @test_id;
+    END;
+    IF @q1 IS NOT NULL OR @q2 IS NOT NULL
+        DELETE FROM dbo.[QUESTION] WHERE question_id IN (@q1, @q2);
+    THROW;
+END CATCH;
 GO
 
 -- =================================================================================
