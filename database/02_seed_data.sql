@@ -336,11 +336,9 @@ BEGIN
     RETURN;
 END;
 
-DECLARE @c1 INT, @c2 INT, @c3 INT;
-SELECT @c1 = MAX(CASE WHEN rn = 1 THEN class_id END),
-       @c2 = MAX(CASE WHEN rn = 2 THEN class_id END),
-       @c3 = MAX(CASE WHEN rn = 3 THEN class_id END)
-FROM (SELECT class_id, ROW_NUMBER() OVER (ORDER BY class_id) AS rn FROM [CLASS]) AS x;
+DECLARE @c1 INT = (SELECT class_id FROM [CLASS] ORDER BY class_id OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY);
+DECLARE @c2 INT = (SELECT class_id FROM [CLASS] ORDER BY class_id OFFSET 1 ROWS FETCH NEXT 1 ROWS ONLY);
+DECLARE @c3 INT = (SELECT class_id FROM [CLASS] ORDER BY class_id OFFSET 2 ROWS FETCH NEXT 1 ROWS ONLY);
 
 IF @c3 IS NULL
 BEGIN
@@ -348,12 +346,17 @@ BEGIN
     RETURN;
 END;
 
+-- Chuong dau tien / thu hai cua lop 1, chuong dau tien cua lop 3 (NULL neu chua co)
 DECLARE @c1ch1 INT = (SELECT MIN(chapter_id) FROM [CHAPTER] WHERE class_id = @c1);
 DECLARE @c1ch2 INT = (SELECT MIN(chapter_id) FROM [CHAPTER] WHERE class_id = @c1 AND chapter_id > @c1ch1);
 DECLARE @c3ch1 INT = (SELECT MIN(chapter_id) FROM [CHAPTER] WHERE class_id = @c3);
 
 BEGIN TRANSACTION;
 
+-- ---------------------------------------------------------------------
+-- QUESTION (12 cau): trac nghiem, dung/sai, tu luan.
+-- Gan id thu cong de CHOICE / CONTAINS_QUESTION / demo tham chieu on dinh.
+-- ---------------------------------------------------------------------
 SET IDENTITY_INSERT [QUESTION] ON;
 INSERT INTO [QUESTION] (question_id, question_type, question_content, max_score) VALUES
  (1,  N'MULTIPLE_CHOICE', N'Thuộc tính khóa chính của một quan hệ phải thỏa tính chất nào sau đây?', 1.00),
@@ -370,38 +373,56 @@ INSERT INTO [QUESTION] (question_id, question_type, question_content, max_score)
  (12, N'ESSAY',           N'Giải thích thuộc tính dẫn xuất và cho một ví dụ trong hệ thống quản lý học tập.', 2.00);
 SET IDENTITY_INSERT [QUESTION] OFF;
 
+-- ---------------------------------------------------------------------
+-- CHOICE (30 dong). Moi cau trac nghiem / dung-sai co dung 1 dap an dung
+-- (rang buoc ngu nghia 19). Cau tu luan (7, 8, 12) khong co lua chon.
+-- ---------------------------------------------------------------------
 INSERT INTO [CHOICE] (choice_content, is_true, question_id) VALUES
+ -- Q1
  (N'Giá trị duy nhất và không được NULL', 1, 1),
  (N'Có thể trùng giữa các bộ',            0, 1),
  (N'Luôn phải là kiểu số nguyên',         0, 1),
  (N'Được phép nhận giá trị NULL',         0, 1),
+ -- Q2
  (N'Phép chọn (σ)',                       1, 2),
  (N'Phép chiếu (π)',                      0, 2),
  (N'Phép hợp (∪)',                        0, 2),
  (N'Phép tích Descartes (×)',             0, 2),
+ -- Q3 (dung/sai)
  (N'Đúng', 0, 3),
  (N'Sai',  1, 3),
+ -- Q4 (dung/sai)
  (N'Đúng', 1, 4),
  (N'Sai',  0, 4),
+ -- Q5
  (N'Phụ thuộc bắc cầu',                   1, 5),
  (N'Phụ thuộc hàm riêng phần',            0, 5),
  (N'Phụ thuộc đa trị',                    0, 5),
  (N'Phụ thuộc hàm tầm thường',            0, 5),
+ -- Q6
  (N'HAVING',                              1, 6),
  (N'WHERE',                               0, 6),
  (N'ORDER BY',                            0, 6),
  (N'DISTINCT',                            0, 6),
+ -- Q9
  (N'TRUNCATE TABLE',                      1, 9),
  (N'DROP TABLE',                          0, 9),
  (N'ALTER TABLE',                         0, 9),
  (N'DROP DATABASE',                       0, 9),
+ -- Q10 (dung/sai)
  (N'Đúng', 0, 10),
  (N'Sai',  1, 10),
+ -- Q11
  (N'FOREIGN KEY',                         1, 11),
  (N'UNIQUE',                              0, 11),
  (N'CHECK',                               0, 11),
  (N'DEFAULT',                             0, 11);
 
+-- ---------------------------------------------------------------------
+-- TEST (6 bai): 4 phuong thuc tinh diem, co bai gan chuong, co bai nop tap tin.
+-- Dung gia tri khop CHECK: test_end > test_start; test_timer (phut) *60
+-- khong vuot khoang mo de -> dong de. Bai nop tap tin: test_timer = NULL.
+-- ---------------------------------------------------------------------
 SET IDENTITY_INSERT [TEST] ON;
 INSERT INTO [TEST] (test_id, test_name, test_type, test_start, test_end, test_timer,
                     max_attempts, grading_method, class_id, chapter_id) VALUES
@@ -413,6 +434,10 @@ INSERT INTO [TEST] (test_id, test_name, test_type, test_start, test_end, test_ti
  (6, N'Kiểm tra cuối kỳ',                    N'ONLINE',          '2026-12-20T07:30:00', '2026-12-20T11:30:00', 90,   1, 'HIGHEST', @c3, NULL);
 SET IDENTITY_INSERT [TEST] OFF;
 
+-- ---------------------------------------------------------------------
+-- CONTAINS_QUESTION: moi bai >= 1 cau (rang buoc 17); mot cau xuat hien
+-- o nhieu bai (N:M); custom_score ghi de diem mac dinh (NULL = dung max_score).
+-- ---------------------------------------------------------------------
 INSERT INTO [CONTAINS_QUESTION] (test_id, question_id, custom_score) VALUES
  (1, 1, NULL), (1, 2, 1.50), (1, 3, NULL), (1, 6, NULL),
  (2, 4, NULL), (2, 5, 2.50), (2, 9, NULL), (2, 11, NULL),
@@ -423,12 +448,12 @@ INSERT INTO [CONTAINS_QUESTION] (test_id, question_id, custom_score) VALUES
 
 COMMIT TRANSACTION;
 
-SELECT N'QUESTION' AS ten_bang, COUNT(*) AS so_dong FROM [QUESTION]
+-- Kiem tra nhanh so dong da chen
+SELECT N'QUESTION' AS bang, COUNT(*) AS so_dong FROM [QUESTION]
 UNION ALL SELECT N'CHOICE',            COUNT(*) FROM [CHOICE]
 UNION ALL SELECT N'TEST',              COUNT(*) FROM [TEST]
 UNION ALL SELECT N'CONTAINS_QUESTION', COUNT(*) FROM [CONTAINS_QUESTION];
 GO
-
 -- =================================================================================
 -- PHẦN CỦA TV5: CỤM 4 - LÀM BÀI KIỂM TRA & DIỄN ĐÀN THẢO LUẬN
 -- Bảng: [TAKES_TEST], [ATTEMPT], [STUDENT_ANSWER], [POST], [COMMENT]
