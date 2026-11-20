@@ -37,3 +37,29 @@ $RECYCLE.BIN/
 *.user
 *.userosscache
 *.sln.docstates
+
+# Môi trường ảo & file biên dịch Python (Phần 3 - FastAPI)
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.env
+.env.local
+
+# File trung gian khi biên dịch LaTeX (Báo cáo)
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.lof
+*.lot
+*.out
+*.toc
+*.synctex.gz
+*.nav
+*.snm
+*.vrb
