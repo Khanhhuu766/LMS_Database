@@ -1,4 +1,4 @@
-﻿-- =================================================================================
+-- =================================================================================
 -- KỊCH BẢN KIỂM THỬ & MINH HỌA KHI BÁO CÁO (DEMO TEST CASES)
 -- Yêu cầu đề bài :
 --   - Chuẩn bị sẵn các câu lệnh và dữ liệu minh họa cho việc kiểm tra Trigger (2.2),
@@ -10,7 +10,115 @@
 -- PHẦN CỦA TV1: KIỂM THỬ MỤC 2.1 - 3 THỦ TỤC THÊM (INSERT), SỬA (UPDATE), XÓA (DELETE)
 -- Quy ước: TV1 CHỈ VIẾT TRONG KHUNG NÀY, KHÔNG SỬA RA NGOÀI KHUNG
 -- =================================================================================
--- TODO
+USE [LMS_DB];
+GO
+SET NOCOUNT ON;
+
+PRINT N'=== [TV1 - MỤC 2.1] BẮT ĐẦU KIỂM THỬ CRUD TRÊN BẢNG [POST] ===';
+
+DECLARE @demo_post_id INT = NULL;
+
+BEGIN TRY
+    -- 1. Kiểm tra INSERT thất bại: Tên bài đăng để trống (lỗi 51001)
+    BEGIN TRY
+        EXEC dbo.usp_Post_Insert @PostName = N'   ', @UaId = 1001, @PostDescription = N'Test', @ClassId = 3;
+        THROW 51090, N'FAIL 1: Khong chan ten bai dang rong.', 1;
+    END TRY
+    BEGIN CATCH
+        IF ERROR_NUMBER() = 51001
+            PRINT N'PASS 1: Chan ten bai dang rong (51001): ' + ERROR_MESSAGE();
+        ELSE THROW;
+    END CATCH;
+
+    -- 2. Kiểm tra INSERT thất bại: Người dùng không tồn tại (lỗi 51004)
+    BEGIN TRY
+        EXEC dbo.usp_Post_Insert @PostName = N'Test user', @UaId = 99999, @PostDescription = N'Test', @ClassId = 3;
+        THROW 51091, N'FAIL 2: Khong chan ua_id khong ton tai.', 1;
+    END TRY
+    BEGIN CATCH
+        IF ERROR_NUMBER() = 51004
+            PRINT N'PASS 2: Chan ua_id khong ton tai (51004): ' + ERROR_MESSAGE();
+        ELSE THROW;
+    END CATCH;
+
+    -- 3. Kiểm tra INSERT thất bại: SV4 (ua_id = 1004) bị khóa thảo luận ở lớp 2 (lỗi 51007)
+    BEGIN TRY
+        EXEC dbo.usp_Post_Insert @PostName = N'Test bi khoa thao luan', @UaId = 1004, @PostDescription = N'Test', @ClassId = 2;
+        THROW 51092, N'FAIL 3: Khong chan SV bi khoa thao luan trong lop 2.', 1;
+    END TRY
+    BEGIN CATCH
+        IF ERROR_NUMBER() = 51007
+            PRINT N'PASS 3: Chan SV4 dang bai trong lop 2 do is_allowed_to_discuss = 0 (51007).';
+        ELSE THROW;
+    END CATCH;
+
+    -- 4. Kiểm tra INSERT thành công: SV1 (ua_id = 1001) đăng bài vào lớp 3
+    DECLARE @ins_out TABLE (post_id INT, result_message NVARCHAR(200));
+    INSERT INTO @ins_out
+    EXEC dbo.usp_Post_Insert
+        @PostName        = N'TV1 Demo - Thao luan BTL2',
+        @UaId            = 1001,
+        @PostDescription = N'Noi dung bai dang demo cua TV1.',
+        @ClassId         = 3;
+
+    SELECT TOP (1) @demo_post_id = post_id FROM @ins_out;
+    IF @demo_post_id IS NOT NULL
+        PRINT N'PASS 4: INSERT thanh cong bai dang moi (post_id = ' + CAST(@demo_post_id AS NVARCHAR(20)) + N').';
+    ELSE
+        THROW 51093, N'FAIL 4: INSERT khong tra ve post_id.', 1;
+
+    -- 5. Kiểm tra UPDATE thất bại: Người khác (ua_id = 1002) sửa bài của 1001 (lỗi 51017)
+    BEGIN TRY
+        EXEC dbo.usp_Post_Update
+            @PostId          = @demo_post_id,
+            @RequesterUaId   = 1002,
+            @PostName        = N'Sua trai phep',
+            @PostDescription = N'Test';
+        THROW 51094, N'FAIL 5: Khong chan nguoi khac sua bai dang.', 1;
+    END TRY
+    BEGIN CATCH
+        IF ERROR_NUMBER() = 51017
+            PRINT N'PASS 5: Chan nguoi khong phai tac gia sua bai (51017).';
+        ELSE THROW;
+    END CATCH;
+
+    -- 6. Kiểm tra UPDATE thành công: Chính tác giả (ua_id = 1001) cập nhật bài
+    DECLARE @upd_out TABLE (post_id INT, result_message NVARCHAR(200));
+    INSERT INTO @upd_out
+    EXEC dbo.usp_Post_Update
+        @PostId          = @demo_post_id,
+        @RequesterUaId   = 1001,
+        @PostName        = N'TV1 Demo - Thao luan BTL2 (Da cap nhat)',
+        @PostDescription = N'Noi dung da duoc tac gia cap nhat.';
+    PRINT N'PASS 6: UPDATE thanh cong boi chinh tac gia.';
+
+    -- 7. Kiểm tra DELETE thất bại: Không cho xóa bài đã có bình luận (post_id = 1 của 1011, lỗi 51026)
+    BEGIN TRY
+        EXEC dbo.usp_Post_Delete @PostId = 1, @RequesterUaId = 1011;
+        THROW 51095, N'FAIL 7: Khong chan xoa bai dang da co binh luan.', 1;
+    END TRY
+    BEGIN CATCH
+        IF ERROR_NUMBER() = 51026
+            PRINT N'PASS 7: Chan xoa bai dang da co binh luan de bao toan lich su (51026).';
+        ELSE THROW;
+    END CATCH;
+
+    -- 8. Kiểm tra DELETE thành công: Tác giả (ua_id = 1001) xóa bài demo vừa tạo (chưa có bình luận)
+    DECLARE @del_out TABLE (post_id INT, result_message NVARCHAR(200));
+    INSERT INTO @del_out
+    EXEC dbo.usp_Post_Delete @PostId = @demo_post_id, @RequesterUaId = 1001;
+    SET @demo_post_id = NULL;
+    PRINT N'PASS 8: DELETE thanh cong bai dang chua co binh luan (da don sach du lieu demo).';
+
+    PRINT N'=== [TV1 - MỤC 2.1] HOÀN TẤT KIỂM THỬ 8/8 CASE THÀNH CÔNG ===';
+END TRY
+BEGIN CATCH
+    PRINT N'DEMO TV1 GAP LOI: ' + ERROR_MESSAGE();
+    IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
+    IF @demo_post_id IS NOT NULL
+        DELETE FROM dbo.[POST] WHERE post_id = @demo_post_id;
+    THROW;
+END CATCH;
 GO
 
 -- =================================================================================
