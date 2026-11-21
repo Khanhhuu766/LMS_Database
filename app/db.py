@@ -95,6 +95,12 @@ def parse_sql_error(exc: pyodbc.Error) -> tuple[int | None, str, int]:
     """
     raw_msg = str(exc.args[1]) if len(exc.args) > 1 else str(exc)
 
+    # ODBC có thể nối thông báo THROW với thông báo kết thúc câu lệnh.
+    for diagnostic in raw_msg.split("[SQL Server]")[1:]:
+        match = re.search(r"\s*\((5\d{4})\)(?=\s*(?:\([^()]*\))?\s*(?:;|$))", diagnostic)
+        if match:
+            return int(match.group(1)), diagnostic[:match.start()].strip(), 400
+
     # Tìm mã lỗi dạng (51026) đứng trước (SQLExecDirectW) hoặc cuối đoạn thông báo
     code_match = re.search(r"\((\d+)\)\s*(?:\([^)]+\)\s*)?$", raw_msg)
     error_code = int(code_match.group(1)) if code_match else None
