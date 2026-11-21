@@ -284,13 +284,24 @@
                 </div>`;
         }
 
+        const studentMeta = d.student
+            ? `${escapeHtml(d.student.full_name)} (MSSV: ${escapeHtml(d.student.student_code)})`
+            : `<span class="text-danger">Không tìm thấy sinh viên (${escapeHtml(d.student_code || d.student_id)})</span>`;
+        const testMeta = d.test
+            ? `${escapeHtml(d.test.test_name)} — ${escapeHtml(d.test.class_name || "Chung")} [${escapeHtml(d.test.grading_method)}]`
+            : `<span class="text-danger">Không tìm thấy bài kiểm tra (ID: ${escapeHtml(d.test_id)})</span>`;
+
         resultBox.innerHTML = `
             <div class="alert ${alertClass} mb-0">
                 <div class="d-flex justify-content-between align-items-center mb-1">
                     <span class="fw-bold">${escapeHtml(d.status_label)}</span>
                     <span class="fs-4 fw-bold">${escapeHtml(displayScore)}</span>
                 </div>
-                <div class="small">${escapeHtml(d.explanation)}</div>
+                <div class="small border-top border-dark border-opacity-10 pt-2 mt-1 mb-1">
+                    <div><strong>Sinh viên:</strong> ${studentMeta}</div>
+                    <div><strong>Bài kiểm tra:</strong> ${testMeta}</div>
+                </div>
+                <div class="small text-opacity-75">${escapeHtml(d.explanation)}</div>
             </div>
             ${attemptsHtml}
         `;
@@ -383,13 +394,24 @@
                 </div>`;
         }
 
+        const studentMeta = d.student
+            ? `${escapeHtml(d.student.full_name)} (MSSV: ${escapeHtml(d.student.student_code)})`
+            : `<span class="text-danger">Không tìm thấy sinh viên (${escapeHtml(d.student_code || d.student_id)})</span>`;
+        const semesterMeta = d.semester
+            ? `Học kỳ ${escapeHtml(d.semester.semester_id)} (${escapeHtml(d.semester.semester_start)} → ${escapeHtml(d.semester.semester_end)})`
+            : `<span class="text-danger">Không tìm thấy học kỳ (ID: ${escapeHtml(d.semester_id)})</span>`;
+
         resultBox.innerHTML = `
             <div class="alert ${alertClass} mb-0">
                 <div class="d-flex justify-content-between align-items-center mb-1">
                     <span class="fw-bold">${escapeHtml(d.status_label)}</span>
                     <span class="fs-4 fw-bold">${escapeHtml(displayScore)}${d.status !== "INVALID_PARAM" ? " / 100" : ""}</span>
                 </div>
-                <div class="small">${escapeHtml(d.explanation)}</div>
+                <div class="small border-top border-dark border-opacity-10 pt-2 mt-1 mb-1">
+                    <div><strong>Sinh viên:</strong> ${studentMeta}</div>
+                    <div><strong>Học kỳ:</strong> ${semesterMeta}</div>
+                </div>
+                <div class="small text-opacity-75">${escapeHtml(d.explanation)}</div>
                 ${progressHtml}
             </div>
             ${breakdownHtml}
