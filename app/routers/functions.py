@@ -1,24 +1,60 @@
 import pyodbc
 from fastapi import APIRouter, Query
 
-from app.db import api_ok, fetch_all, fetch_one, handle_sql_error
+from app.db import api_error, api_ok, fetch_all, fetch_one, handle_sql_error
 
 router = APIRouter(prefix="/api/functions", tags=["Cursor Functions (Mục 3.3)"])
 
 
+def _resolve_student_id(
+    student_id: int | None,
+    student_code: str | None,
+) -> tuple[int, str | None] | None:
+    """
+    Chuyển đổi từ MSSV (student_code) sang STUDENT.user_id nếu người dùng nhập MSSV,
+    hoặc giữ nguyên student_id nếu truyền trực tiếp.
+    Trả về None nếu cả hai đều thiếu.
+    """
+    if student_code is not None:
+        cleaned = student_code.strip()
+        if not cleaned:
+            return -1, ""
+        row = fetch_one(
+            "SELECT user_id FROM dbo.[STUDENT] WHERE student_code = ?;",
+            (cleaned,),
+        )
+        return (row["user_id"], cleaned) if row else (-1, cleaned)
+
+    if student_id is not None:
+        return student_id, None
+
+    return None
+
+
 @router.get("/test-score")
 def calculate_student_test_score(
-    student_id: int = Query(..., description="Mã sinh viên (STUDENT.user_id)"),
+    student_id: int | None = Query(default=None, description="Mã nội bộ (STUDENT.user_id)"),
+    student_code: str | None = Query(default=None, description="MSSV (STUDENT.student_code)"),
     test_id: int = Query(..., description="Mã bài kiểm tra (TEST.test_id)"),
 ):
     """
-    Gọi Scalar Function dbo.fn_CalculateStudentTestScore(@StudentId, @TestId)
-    và trả kèm thông tin chi tiết các lần làm bài (ATTEMPT) để đối chiếu trên UI.
+    Gọi Scalar Function dbo.fn_CalculateStudentTestScore(@StudentId, @TestId).
+    Hỗ trợ tra cứu bằng MSSV (student_code) hoặc student_id nội bộ.
     """
     try:
+        resolved = _resolve_student_id(student_id, student_code)
+        if resolved is None:
+            return api_error(
+                message="Vui lòng cung cấp MSSV (student_code) hoặc student_id.",
+                error_code=422,
+                status_code=422,
+            )
+
+        resolved_student_id, input_code = resolved
+
         fn_row = fetch_one(
             "SELECT dbo.fn_CalculateStudentTestScore(?, ?) AS final_score;",
-            (student_id, test_id),
+            (resolved_student_id, test_id),
         )
         raw_score = fn_row["final_score"] if fn_row else None
 
@@ -31,9 +67,9 @@ def calculate_student_test_score(
                 INNER JOIN dbo.[USER] AS u ON u.user_id = st.user_id
                 WHERE st.user_id = ?;
                 """,
-                (student_id,),
+                (resolved_student_id,),
             )
-            if student_id > 0
+            if resolved_student_id > 0
             else None
         )
 
@@ -61,16 +97,21 @@ def calculate_student_test_score(
                 WHERE student_id = ? AND test_id = ?
                 ORDER BY attempt_index ASC;
                 """,
-                (student_id, test_id),
+                (resolved_student_id, test_id),
             )
 
         if raw_score == -1.0:
             status = "INVALID_PARAM"
             status_label = "Tham số không hợp lệ (-1.00)"
-            explanation = (
-                "Mã sinh viên hoặc mã bài kiểm tra phải là số nguyên dương "
-                "và tồn tại trong hệ thống."
-            )
+            if input_code is not None and student_info is None:
+                explanation = (
+                    f"Không tìm thấy sinh viên có MSSV '{input_code}' trong bảng STUDENT."
+                )
+            else:
+                explanation = (
+                    "MSSV/Mã sinh viên hoặc mã bài kiểm tra phải hợp lệ "
+                    "và tồn tại trong hệ thống."
+                )
         elif raw_score == -2.0:
             status = "NOT_ENROLLED"
             status_label = "Vi phạm RB3: Chưa đăng ký lớp (-2.00)"
@@ -93,7 +134,8 @@ def calculate_student_test_score(
 
         return api_ok(
             {
-                "student_id": student_id,
+                "student_id": resolved_student_id,
+                "student_code": input_code or (student_info["student_code"] if student_info else None),
                 "test_id": test_id,
                 "final_score": raw_score,
                 "status": status,
@@ -110,17 +152,28 @@ def calculate_student_test_score(
 
 @router.get("/engagement-score")
 def calculate_student_engagement_score(
-    student_id: int = Query(..., description="Mã sinh viên (STUDENT.user_id)"),
+    student_id: int | None = Query(default=None, description="Mã nội bộ (STUDENT.user_id)"),
+    student_code: str | None = Query(default=None, description="MSSV (STUDENT.student_code)"),
     semester_id: int = Query(..., description="Mã học kỳ (SEMESTER.semester_id)"),
 ):
     """
-    Gọi Scalar Function dbo.fn_CalculateStudentEngagementScore(@StudentId, @SemesterId)
-    và trả kèm chi tiết từng lớp học trong học kỳ để giải thích điểm thành phần.
+    Gọi Scalar Function dbo.fn_CalculateStudentEngagementScore(@StudentId, @SemesterId).
+    Hỗ trợ tra cứu bằng MSSV (student_code) hoặc student_id nội bộ.
     """
     try:
+        resolved = _resolve_student_id(student_id, student_code)
+        if resolved is None:
+            return api_error(
+                message="Vui lòng cung cấp MSSV (student_code) hoặc student_id.",
+                error_code=422,
+                status_code=422,
+            )
+
+        resolved_student_id, input_code = resolved
+
         fn_row = fetch_one(
             "SELECT dbo.fn_CalculateStudentEngagementScore(?, ?) AS engagement_score;",
-            (student_id, semester_id),
+            (resolved_student_id, semester_id),
         )
         raw_score = fn_row["engagement_score"] if fn_row else None
 
@@ -133,9 +186,9 @@ def calculate_student_engagement_score(
                 INNER JOIN dbo.[USER] AS u ON u.user_id = st.user_id
                 WHERE st.user_id = ?;
                 """,
-                (student_id,),
+                (resolved_student_id,),
             )
-            if student_id > 0
+            if resolved_student_id > 0
             else None
         )
 
@@ -189,16 +242,21 @@ def calculate_student_engagement_score(
                 WHERE e.student_id = ? AND c.semester_id = ?
                 ORDER BY c.class_id ASC;
                 """,
-                (ua_id, ua_id, student_id, student_id, semester_id),
+                (ua_id, ua_id, resolved_student_id, resolved_student_id, semester_id),
             )
 
         if raw_score == -1.0:
             status = "INVALID_PARAM"
             status_label = "Tham số không hợp lệ (-1.00)"
-            explanation = (
-                "Mã sinh viên hoặc mã học kỳ phải là số nguyên dương "
-                "và tồn tại trong hệ thống."
-            )
+            if input_code is not None and student_info is None:
+                explanation = (
+                    f"Không tìm thấy sinh viên có MSSV '{input_code}' trong bảng STUDENT."
+                )
+            else:
+                explanation = (
+                    "MSSV/Mã sinh viên hoặc mã học kỳ phải hợp lệ "
+                    "và tồn tại trong hệ thống."
+                )
         elif raw_score == 0.0 and len(classes_breakdown) == 0:
             status = "NO_CLASSES"
             status_label = "Chưa đăng ký lớp trong học kỳ (0.00)"
@@ -214,7 +272,8 @@ def calculate_student_engagement_score(
 
         return api_ok(
             {
-                "student_id": student_id,
+                "student_id": resolved_student_id,
+                "student_code": input_code or (student_info["student_code"] if student_info else None),
                 "semester_id": semester_id,
                 "engagement_score": raw_score,
                 "status": status,

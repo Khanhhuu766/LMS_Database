@@ -14,7 +14,7 @@
         return students
             .map(
                 (st) =>
-                    `<option value="${st.student_id}">${escapeHtml(st.student_code)} - ${escapeHtml(st.full_name)} (ID: ${st.student_id})</option>`
+                    `<option value="${st.student_id}" data-code="${escapeHtml(st.student_code)}">${escapeHtml(st.student_code)} - ${escapeHtml(st.full_name)}</option>`
             )
             .join("");
     }
@@ -70,7 +70,7 @@
                                 <div class="form-check form-switch">
                                     <input class="form-check-input" type="checkbox" id="fn1-manual-toggle">
                                     <label class="form-check-label small text-secondary" for="fn1-manual-toggle">
-                                        Nhập ID thủ công (dùng để test tham số sai / không tồn tại trả về -1.00)
+                                        Nhập ID thủ công (mặc định giữ nguyên ID đang chọn, có thể sửa tự do để test)
                                     </label>
                                 </div>
 
@@ -87,12 +87,14 @@
 
                                 <div id="fn1-manual-group" class="row g-2 d-none">
                                     <div class="col-6">
-                                        <label class="form-label fw-semibold mb-1">Student ID</label>
-                                        <input type="number" class="form-control" id="fn1-student-input" value="-1" placeholder="VD: -1 hoặc 999">
+                                        <label class="form-label fw-semibold mb-1">MSSV (student_code)</label>
+                                        <input type="text" class="form-control" id="fn1-student-input" value="2410001" placeholder="VD: 2410001 hoặc 9999999">
+                                        <div class="form-text">VD hợp lệ: 2410001..2510005</div>
                                     </div>
                                     <div class="col-6">
-                                        <label class="form-label fw-semibold mb-1">Test ID</label>
-                                        <input type="number" class="form-control" id="fn1-test-input" value="1" placeholder="VD: 1 hoặc 999">
+                                        <label class="form-label fw-semibold mb-1">Test ID (test_id)</label>
+                                        <input type="number" class="form-control" id="fn1-test-input" value="1" placeholder="Hợp lệ: 1..6 | Sai: -1, 999">
+                                        <div class="form-text">Hợp lệ: 1..6</div>
                                     </div>
                                 </div>
 
@@ -123,7 +125,7 @@
                                 <div class="form-check form-switch">
                                     <input class="form-check-input" type="checkbox" id="fn2-manual-toggle">
                                     <label class="form-check-label small text-secondary" for="fn2-manual-toggle">
-                                        Nhập ID thủ công (dùng để test tham số sai / không tồn tại trả về -1.00)
+                                        Nhập ID thủ công (mặc định giữ nguyên ID đang chọn, có thể sửa tự do để test)
                                     </label>
                                 </div>
 
@@ -140,12 +142,14 @@
 
                                 <div id="fn2-manual-group" class="row g-2 d-none">
                                     <div class="col-6">
-                                        <label class="form-label fw-semibold mb-1">Student ID</label>
-                                        <input type="number" class="form-control" id="fn2-student-input" value="1" placeholder="VD: 1 hoặc 999">
+                                        <label class="form-label fw-semibold mb-1">MSSV (student_code)</label>
+                                        <input type="text" class="form-control" id="fn2-student-input" value="2410001" placeholder="VD: 2410001 hoặc 9999999">
+                                        <div class="form-text">VD hợp lệ: 2410001..2510005</div>
                                     </div>
                                     <div class="col-6">
-                                        <label class="form-label fw-semibold mb-1">Semester ID</label>
-                                        <input type="number" class="form-control" id="fn2-semester-input" value="-2" placeholder="VD: -2 hoặc 999">
+                                        <label class="form-label fw-semibold mb-1">Semester ID (semester_id)</label>
+                                        <input type="number" class="form-control" id="fn2-semester-input" value="1" placeholder="Hợp lệ: 1..6 | Sai: -2, 999">
+                                        <div class="form-text">Hợp lệ: 1..6</div>
                                     </div>
                                 </div>
 
@@ -174,6 +178,14 @@
         const fn1ManualGroup = document.getElementById("fn1-manual-group");
 
         fn1Toggle.addEventListener("change", () => {
+            if (fn1Toggle.checked) {
+                const sel = document.getElementById("fn1-student-select");
+                const selectedOpt = sel.options[sel.selectedIndex];
+                document.getElementById("fn1-student-input").value =
+                    selectedOpt?.dataset?.code || "2410001";
+                document.getElementById("fn1-test-input").value =
+                    document.getElementById("fn1-test-select").value || "1";
+            }
             fn1SelectGroup.classList.toggle("d-none", fn1Toggle.checked);
             fn1ManualGroup.classList.toggle("d-none", !fn1Toggle.checked);
         });
@@ -183,6 +195,14 @@
         const fn2ManualGroup = document.getElementById("fn2-manual-group");
 
         fn2Toggle.addEventListener("change", () => {
+            if (fn2Toggle.checked) {
+                const sel = document.getElementById("fn2-student-select");
+                const selectedOpt = sel.options[sel.selectedIndex];
+                document.getElementById("fn2-student-input").value =
+                    selectedOpt?.dataset?.code || "2410001";
+                document.getElementById("fn2-semester-input").value =
+                    document.getElementById("fn2-semester-select").value || "1";
+            }
             fn2SelectGroup.classList.toggle("d-none", fn2Toggle.checked);
             fn2ManualGroup.classList.toggle("d-none", !fn2Toggle.checked);
         });
@@ -196,22 +216,25 @@
         const resultBox = document.getElementById("fn1-result-box");
         const isManual = document.getElementById("fn1-manual-toggle").checked;
 
-        const studentId = isManual
+        const studentParam = isManual
+            ? `student_code=${encodeURIComponent(document.getElementById("fn1-student-input").value.trim())}`
+            : `student_id=${encodeURIComponent(document.getElementById("fn1-student-select").value)}`;
+        const studentValueCheck = isManual
             ? document.getElementById("fn1-student-input").value.trim()
             : document.getElementById("fn1-student-select").value;
         const testId = isManual
             ? document.getElementById("fn1-test-input").value.trim()
             : document.getElementById("fn1-test-select").value;
 
-        if (!studentId || !testId) {
-            resultBox.innerHTML = `<div class="alert alert-warning mb-0">Vui lòng nhập đầy đủ Student ID và Test ID.</div>`;
+        if (!studentValueCheck || !testId) {
+            resultBox.innerHTML = `<div class="alert alert-warning mb-0">Vui lòng nhập đầy đủ MSSV và Test ID.</div>`;
             return;
         }
 
         resultBox.innerHTML = `<div class="text-secondary"><i class="bi bi-hourglass-split me-1"></i>Đang tính toán...</div>`;
 
         const res = await apiRequest(
-            `/api/functions/test-score?student_id=${encodeURIComponent(studentId)}&test_id=${encodeURIComponent(testId)}`
+            `/api/functions/test-score?${studentParam}&test_id=${encodeURIComponent(testId)}`
         );
 
         if (!res.success) {
@@ -278,22 +301,25 @@
         const resultBox = document.getElementById("fn2-result-box");
         const isManual = document.getElementById("fn2-manual-toggle").checked;
 
-        const studentId = isManual
+        const studentParam = isManual
+            ? `student_code=${encodeURIComponent(document.getElementById("fn2-student-input").value.trim())}`
+            : `student_id=${encodeURIComponent(document.getElementById("fn2-student-select").value)}`;
+        const studentValueCheck = isManual
             ? document.getElementById("fn2-student-input").value.trim()
             : document.getElementById("fn2-student-select").value;
         const semesterId = isManual
             ? document.getElementById("fn2-semester-input").value.trim()
             : document.getElementById("fn2-semester-select").value;
 
-        if (!studentId || !semesterId) {
-            resultBox.innerHTML = `<div class="alert alert-warning mb-0">Vui lòng nhập đầy đủ Student ID và Semester ID.</div>`;
+        if (!studentValueCheck || !semesterId) {
+            resultBox.innerHTML = `<div class="alert alert-warning mb-0">Vui lòng nhập đầy đủ MSSV và Semester ID.</div>`;
             return;
         }
 
         resultBox.innerHTML = `<div class="text-secondary"><i class="bi bi-hourglass-split me-1"></i>Đang tính toán...</div>`;
 
         const res = await apiRequest(
-            `/api/functions/engagement-score?student_id=${encodeURIComponent(studentId)}&semester_id=${encodeURIComponent(semesterId)}`
+            `/api/functions/engagement-score?${studentParam}&semester_id=${encodeURIComponent(semesterId)}`
         );
 
         if (!res.success) {
