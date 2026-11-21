@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BK-LMS | Hệ thống Quản lý Học tập</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f4f6f9; }
+        .navbar-brand { font-weight: 700; letter-spacing: 0.3px; }
+        .card { border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    </style>
+</head>
+<body>
+    <!-- Thanh tiêu đề & trạng thái kết nối LMS_DB -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="bi bi-mortarboard-fill me-2"></i>BK-LMS Database App
+            </a>
+            <div class="d-flex align-items-center">
+                <span id="db-status-badge" class="badge bg-warning text-dark px-3 py-2">
+                    <i class="bi bi-hourglass-split me-1"></i>Đang kiểm tra kết nối...
+                </span>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container my-4">
+        <!-- Khu vực hiển thị thông báo thành công / báo lỗi SQL Server -->
+        <div id="global-alert-container"></div>
+
+        <!-- Điều hướng 3 Tab chức năng chính -->
+        <ul class="nav nav-tabs mb-3" id="mainTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active fw-semibold" id="posts-tab" data-bs-toggle="tab"
+                        data-bs-target="#tab-posts" type="button" role="tab">
+                    <i class="bi bi-chat-square-text me-1"></i>Quản lý Bài đăng [POST] (3.1 & 3.2)
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link fw-semibold" id="stats-tab" data-bs-toggle="tab"
+                        data-bs-target="#tab-stats" type="button" role="tab">
+                    <i class="bi bi-bar-chart-line me-1"></i>Thống kê Kiểm tra (3.3)
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link fw-semibold" id="functions-tab" data-bs-toggle="tab"
+                        data-bs-target="#tab-functions" type="button" role="tab">
+                    <i class="bi bi-calculator me-1"></i>Tính điểm Sinh viên – Cursor (3.3)
+                </button>
+            </li>
+        </ul>
+
+        <!-- Nội dung các Tab -->
+        <div class="tab-content" id="mainTabsContent">
+            <!-- TAB 1: MỤC 3.1 & 3.2 -->
+            <div class="tab-pane fade show active" id="tab-posts" role="tabpanel">
+                <div class="card p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0 text-primary">Danh sách & Tìm kiếm Bài đăng ([POST])</h5>
+                        <button class="btn btn-primary" id="btn-open-create-post" disabled>
+                            <i class="bi bi-plus-circle me-1"></i>Tạo bài đăng mới (Chờ Mục 3.1)
+                        </button>
+                    </div>
+                    <div id="posts-search-area" class="text-muted">
+                        TODO (Giai đoạn 2): Trần Minh Nhật dựng bộ lọc & bảng danh sách <code>usp_Post_Search</code>;
+                        Phạm Hoàng Hà gắn Modal Thêm/Sửa/Xóa <code>usp_Post_*</code> tại đây.
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: MỤC 3.3 (THỐNG KÊ) -->
+            <div class="tab-pane fade" id="tab-stats" role="tabpanel">
+                <div class="card p-4">
+                    <h5 class="mb-3 text-primary">Thống kê kết quả Bài kiểm tra (<code>usp_Test_ScoreStatistics</code>)</h5>
+                    <div id="test-stats-area" class="text-muted">
+                        TODO (Giai đoạn 2): Trần Minh Nhật dựng bộ lọc <code>WHERE/HAVING</code> và bảng thống kê tại đây.
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: MỤC 3.3 (HÀM CURSOR) -->
+            <div class="tab-pane fade" id="tab-functions" role="tabpanel">
+                <div class="card p-4">
+                    <h5 class="mb-3 text-primary">Tra cứu & Tính điểm Sinh viên bằng Hàm <code>CURSOR</code></h5>
+                    <div id="cursor-functions-area" class="text-muted">
+                        TODO (Giai đoạn 2): Nguyễn Hữu Khánh dựng form chọn Sinh viên / Bài kiểm tra / Học kỳ tại đây.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Bootstrap Bundle JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- JS Core dùng chung -->
+    <script src="/static/js/core.js"></script>
+    <!-- 3 file JS độc lập cho Giai đoạn 2 -->
+    <script src="/static/js/posts_crud.js"></script>
+    <script src="/static/js/queries.js"></script>
+    <script src="/static/js/functions.js"></script>
+</body>
+</html>
