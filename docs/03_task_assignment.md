@@ -73,7 +73,7 @@
 ### 3.2. Luồng Viết Báo cáo LaTeX
 
 ```text
-[Giai đoạn 1: Dựng khung LaTeX 
+[Giai đoạn 1: Dựng khung LaTeX] 
  - Nguyễn Hữu Khánh: Tạo sections/*.tex tách rời từng chương -> Merge main
                  │
                  ▼
